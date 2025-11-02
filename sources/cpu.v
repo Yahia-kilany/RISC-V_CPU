@@ -3,9 +3,9 @@
 // Company: 
 // Engineer: 
 // 
-// Create Date: 10/14/2025 02:33:23 PM
+// Create Date: 09/30/2025 01:39:16 PM
 // Design Name: 
-// Module Name: cpu
+// Module Name: DFlipFlop
 // Project Name: 
 // Target Devices: 
 // Tool Versions: 
@@ -20,108 +20,179 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-module cpu( input clk,rst, [1:0] ledSel,[3:0] ssdSel, output reg [15:0] instLed, reg [12:0] ssd );
-wire [31:0] pc_in ;
-wire [31:0] pc_out;
-wire [31:0] inst;
-wire [31:0] writeData;
-wire [31:0] regread1;
-wire [31:0] regread2;
-wire [31:0] imm;
-wire [31:0] inAluB;
-wire [31:0] aluOut;
-wire [31:0] pcBranch;
-wire [31:0] dataRead;
-wire Branch;     
-wire MemRead;    
-wire MemtoReg;   
-wire [1:0] ALUOp;
-wire MemWrite;   
-wire ALUSrc;     
-wire RegWrite;
-wire zero;    
-wire [31:0] offset;
-wire muxPc;
-wire [3:0]ALUCtrl;
-Reg  #(.n(32)) pc (.clk(clk), .rst(rst) ,.load(1'b1),.Data(pc_in),.Q(pc_out));
 
-InstMem meminst(.addr(pc_out[7:2]), .data_out(inst));
-
-ControlUnit  ctrlUnit(
-   .opcode(inst[6:2]),
-     .Branch(Branch),
-     .MemRead(MemRead),
-     .MemtoReg(MemtoReg),
-     .ALUOp(ALUOp),
-     .MemWrite(MemWrite),
-     .ALUSrc(ALUSrc),
-     .RegWrite(RegWrite)
+module cpu (
+    input  wire        clk,
+    input  wire        rst,
+    input  wire [1:0]  led_sel_i,
+    input  wire [3:0]  ssd_sel_i,
+    output reg  [15:0] inst_led_o,
+    output reg  [12:0] ssd_o
 );
 
-RegFile #(.n(32))regfile (
-.clk(clk),
-.rst(rst),
-.readAdd1(inst[19:15]),
-.readAdd2(inst[24:20]), 
-.writeAdd(inst[11:7]),
-.regWrite(RegWrite),
-.writeData(writeData),
-.regread1(regread1), 
-.regread2(regread2));
+    // Internal Signals
+    wire [31:0] pc_in_w;
+    wire [31:0] pc_out_w;
+    wire [31:0] inst_w;
+    wire [31:0] write_data_w;
+    wire [31:0] reg_read1_w;
+    wire [31:0] reg_read2_w;
+    wire [31:0] imm_w;
+    wire [31:0] alu_in_b_w;
+    wire [31:0] alu_out_w;
+    wire [31:0] pc_branch_w;
+    wire [31:0] data_read_w;
+    wire [31:0] offset_w;
+    wire        branch_w;
+    wire        mem_read_w;
+    wire        mem_to_reg_w;
+    wire [1:0]  alu_op_w;
+    wire        mem_write_w;
+    wire        alu_src_w;
+    wire        reg_write_w;
+    wire        zero_w;
+    wire        pc_mux_sel_w;
+    wire [3:0]  alu_ctrl_w;
 
-ImmGen generator(.gen_out(imm),
-    .inst(inst));
+    // Program Counter
+    register #(.N(32)) pc (
+        .clk (clk),
+        .rst (rst),
+        .wr_en_i(1'b1),
+        .d_i   (pc_in_w),
+        .d_o   (pc_out_w)
+    );
 
+    // Instruction Memory
+    inst_mem inst_mem_inst (
+        .addr_i (pc_out_w[7:2]),
+        .data_o (inst_w)
+    );
 
-nmux #(.n(32)) alusrc(.a(regread2),.b(imm), .s(ALUSrc), .c(inAluB));
+    // Control Unit
+    control_unit ctrl_unit (
+        .opcode_i   (inst_w[6:2]),
+        .branch_o   (branch_w),
+        .mem_rd_o (mem_read_w),
+        .mem_to_reg_o(mem_to_reg_w),
+        .alu_op_o   (alu_op_w),
+        .mem_wr_o(mem_write_w),
+        .alu_src_o  (alu_src_w),
+        .reg_wr_o(reg_write_w)
+    );
 
-ALUControl aluctrl(
-.ALUOp(ALUOp),         // Control signal from Main Control Unit
-.funct3(inst[14:12]),        // Instruction bits [14:12]
-.funct7(inst[30]),        // Instruction bit [30]
-.ALUCtrl(ALUCtrl)    // ALU operation selection
-);
+    // Register File
+    reg_file #(.N(32)) reg_file_inst (
+        .clk      (clk),
+        .rst      (rst),
+        .rd_addr1_i(inst_w[19:15]),
+        .rd_addr2_i(inst_w[24:20]),
+        .wr_addr_i(inst_w[11:7]),
+        .wr_en_i (reg_write_w),
+        .wr_data_i(write_data_w),
+        .rd_data1_o(reg_read1_w),
+        .rd_data2_o(reg_read2_w)
+    );
 
-alu #(.n(32)) Alu ( 
-.A(regread1), .B(inAluB),.sel(ALUCtrl),
-.zeroflag(zero), .C(aluOut));
+    // Immediate Generator
+    imm_gen imm_gen_inst (
+        .inst_i (inst_w),
+        .gen_o  (imm_w)
+    );
 
-shiftL1 #(32) shiftimm(imm,offset);
+    // ALU Input Mux
+    nmux #(.N(32)) alu_src_mux (
+        .a_i (reg_read2_w),
+        .b_i (imm_w),
+        .s_i (alu_src_w),
+        .c_o (alu_in_b_w)
+    );
 
-RCA_module #(.n(32)) offsetAdder(
-.A(pc_out), .B(offset), .cin(0),
-.cout(), .S(pcBranch));
+    // ALU Control
+    alu_control alu_ctrl_inst (
+        .alu_op_i  (alu_op_w),
+        .funct3_i  (inst_w[14:12]),
+        .funct7_i  (inst_w[30]),
+        .alu_ctrl_o(alu_ctrl_w)
+    );
 
-assign muxPc = Branch & zero;
+    // ALU
+    alu #(.N(32)) alu_inst (
+        .a_i    (reg_read1_w),
+        .b_i    (alu_in_b_w),
+        .sel_i  (alu_ctrl_w),
+        .zero_o (zero_w),
+        .c_o    (alu_out_w)
+    );
 
-nmux #(.n(32)) Pcmux (.a(pc_out+4),.b(pcBranch), .s(muxPc), .c(pc_in));
+    // Shift Left 1 (for branch offset)
+    shift_l1 #(32) shift_imm (
+        .a_i (imm_w),
+        .b_o (offset_w)
+    );
 
-DataMem datamem
-(.clk(clk), .MemRead(MemRead), .MemWrite(MemWrite),
-.addr(aluOut[7:2]), .data_in(regread2), .data_out(dataRead));
-nmux #(.n(32)) memReg (.a(aluOut),.b(dataRead), .s(MemtoReg), .c(writeData));
+    // Branch Address Adder
+    rca #(.N(32)) offset_adder (
+        .a_i   (pc_out_w),
+        .b_i   (offset_w),
+        .c_i (1'b0),
+        .c_o(),
+        .s_o (pc_branch_w)
+    );
 
-always @(*) begin
-case (ledSel)
-            2'b00: instLed = inst[15:0];                            
-            2'b01: instLed = inst[31:16];
-            2'b10: instLed = {2'b00,Branch,MemRead  ,MemtoReg, MemWrite,ALUSrc,RegWrite,muxPc,zero, ALUOp,ALUCtrl};
-            default: instLed = 0;
+    // Next PC Mux (Branch or PC+4)
+    assign pc_mux_sel_w = branch_w & zero_w;
+    nmux #(.N(32)) pc_mux (
+        .a_i (pc_out_w + 32'd4),
+        .b_i (pc_branch_w),
+        .s_i (pc_mux_sel_w),
+        .c_o (pc_in_w)
+    );
+
+    // Data Memory
+    data_mem data_mem_inst (
+        .clk     (clk),
+        .rd_en_i   (mem_read_w),
+        .wr_en_i   (mem_write_w),
+        .addr_i    (alu_out_w[7:2]),
+        .d_i       (reg_read2_w),
+        .d_o       (data_read_w)
+    );
+
+    // Write Back Mux (ALU or Memory)
+    nmux #(.N(32)) mem_to_reg_mux (
+        .a_i (alu_out_w),
+        .b_i (data_read_w),
+        .s_i (mem_to_reg_w),
+        .c_o (write_data_w)
+    );
+
+    // LED and 7-Segment Display
+    always @(*) begin
+        case (led_sel_i)
+            2'b00: inst_led_o = inst_w[15:0];
+            2'b01: inst_led_o = inst_w[31:16];
+            2'b10: inst_led_o = {2'b00, branch_w, mem_read_w, mem_to_reg_w,
+                                 mem_write_w, alu_src_w, reg_write_w,
+                                 pc_mux_sel_w, zero_w, alu_op_w, alu_ctrl_w};
+            default: inst_led_o = 16'd0;
         endcase
-        
-  case (ssdSel)
-        4'b0000: ssd = pc_out [12:0];
-        4'b0001: ssd = pc_out[12:0]+4;
-        4'b0010: ssd = pcBranch[12:0];
-        4'b0011: ssd = pc_in[12:0];
-        4'b0100: ssd = regread1[12:0];
-        4'b0101: ssd = regread2[12:0];
-        4'b0110: ssd = writeData[12:0];
-        4'b0111: ssd = imm[12:0];
-        4'b1000: ssd = offset[12:0];
-        4'b1001: ssd = inAluB[12:0];
-        4'b1010: ssd = aluOut[12:0];
-        4'b1011: ssd = dataRead[12:0];
-  endcase
-end 
+
+        case (ssd_sel_i)
+            4'b0000: ssd_o = pc_out_w[12:0];
+            4'b0001: ssd_o = pc_out_w[12:0] + 13'd4;
+            4'b0010: ssd_o = pc_branch_w[12:0];
+            4'b0011: ssd_o = pc_in_w[12:0];
+            4'b0100: ssd_o = reg_read1_w[12:0];
+            4'b0101: ssd_o = reg_read2_w[12:0];
+            4'b0110: ssd_o = write_data_w[12:0];
+            4'b0111: ssd_o = imm_w[12:0];
+            4'b1000: ssd_o = offset_w[12:0];
+            4'b1001: ssd_o = alu_in_b_w[12:0];
+            4'b1010: ssd_o = alu_out_w[12:0];
+            4'b1011: ssd_o = data_read_w[12:0];
+            default: ssd_o = 13'd0;
+        endcase
+    end
+
 endmodule

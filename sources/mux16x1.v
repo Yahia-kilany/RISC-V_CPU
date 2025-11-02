@@ -1,33 +1,38 @@
 `timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date: 10/07/2025 02:00:42 PM
-// Design Name: 
-// Module Name: mux16x1
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: 
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
 
+/*******************************************************************
+*
+* Module: mux16x1.v
+* Project: RISC-V_CPU
+* Author: Yahia Kilany
+* Author: Ouail Slama 
+* Description: 
+*   N-bit 4-to-1 multiplexer for ALU operations (ADD, SUB, AND, OR).
+*   Select input s_i chooses the output c_o.
+*
+* Change history:
+*   10/07/2025 – Initial lab version created
+*   11/02/2025 – Adapted and cleaned for project use (Yahia)
+*
+*******************************************************************/
 
-module mux16x1 #(parameter n=8)( input[n-1:0] SUM, input[n-1:0] SUB, input[n-1:0] AND, input[n-1:0] OR, input[3:0] s, output reg [n-1:0] c);
+module mux16x1 #(parameter N = 8) (
+    input wire  [3:0]   s_i,
+    input wire  [N-1:0] sum_i,
+    input wire  [N-1:0] sub_i,
+    input wire  [N-1:0] and_i,
+    input wire  [N-1:0] or_i,
+    output reg  [N-1:0] c_o
+);
 
-always @(*) begin
-if(s == 4'b0010) begin c = SUM; end
-else if(s == 4'b0110) begin c = SUB; end
-else if(s == 4'b0000) begin c= AND; end
-else if(s == 4'b0001) begin c = OR; end
-else begin c =0; end
-end
+    always @(*) begin
+        case (s_i)
+            4'b0010: c_o = sum_i;   // ADD
+            4'b0110: c_o = sub_i;   // SUB
+            4'b0000: c_o = and_i;   // AND
+            4'b0001: c_o = or_i;    // OR
+            default: c_o = {N{1'b0}}; //Default to 0
+        endcase
+    end
+
 endmodule
-
