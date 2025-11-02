@@ -12,8 +12,6 @@
 *   thousands_o, hundreds_o, tens_o, ones_o.
 *   Implements the double-dabble (shift-add-3) algorithm.
 *
-* Dependencies:
-*   bcd.v
 *
 * Change history:
 *   09/09/2025 – Initial lab version created
