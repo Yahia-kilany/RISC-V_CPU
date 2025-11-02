@@ -15,7 +15,7 @@
 *   bcd.v
 *
 * Change history:
-*   09/9/2025 – Initial lab version created
+*   09/09/2025 – Initial lab version created
 *   11/02/2025 – Adapted and cleaned for project use (Yahia)
 *
 *******************************************************************/

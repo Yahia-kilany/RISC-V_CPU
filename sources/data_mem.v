@@ -11,7 +11,7 @@
 *   64×32-bit memory. Asynchronous read, synchronous write.
 *
 * Change history:
-*   09/14/2025 – Initial lab version created
+*   10/14/2025 – Initial lab version created
 *   11/02/2025 – Adapted and cleaned for project use (Yahia)
 *
 *******************************************************************/
