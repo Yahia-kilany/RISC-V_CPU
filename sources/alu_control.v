@@ -8,15 +8,18 @@
 * Author: Ouail Slama 
 *
 * Description:
-*   Generates 4-bit ALU control signals based on the ALUOp code from the main control unit
-*   and the instruction's funct3/funct7 fields. Supports:
-*     - R-type operations (ADD, SUB, AND, OR)
-*     - Load/store (ADD)
-*     - Branch equal (SUB)
+*   Generates a 4-bit ALU control signal based on the 2-bit ALUOp input 
+*   from the main control unit and the instruction’s funct3 and funct7 fields. 
+*   Maps instruction types to specific ALU operations, supporting:
+*     - R-type instructions: ADD, SUB, SLL, SLT, SLTU, XOR, SRL, SRA, OR, AND
+*     - U-type instructions: LUI, AUIPC
+*     - B-type instructions: BEQ, BNE (via SUB)
 *
 * Change history:
 *   10/07/2025 – Initial lab version created
 *   11/02/2025 – Adapted and cleaned for project use (Yahia)
+*   11/08/2025 - Added support for the rest of the R-Format
+                     and the U-format (Yahia)
 *
 *******************************************************************/
 
@@ -29,19 +32,18 @@ module alu_control (
 
     always @(*) begin
         case (alu_op_i)
-            2'b00: alu_ctrl_o = `ALU_ADD;  // LW/SW -> ADD
-            2'b01: alu_ctrl_o = `ALU_SUB;  // BEQ   -> SUB
+            2'b00: alu_ctrl_o = `ALU_ADD;  // LW/SW/AUIPC -> ADD
+            2'b01: alu_ctrl_o = `ALU_SUB;  // Branch   -> SUB
             2'b10: begin                  // R-type (use funct fields)
                 case (funct3_i)
-                    `F3_ADD : alu_ctrl_o = funct7_i ? ALU_SUB : ALU_ADD; // ADD
-                    `F3_SLL : alu_ctrl_o = ALU_SLL; //SLL
-                    `F3_SLT : alu_ctrl_o = ALU_SLT // SLT
-                    `F3_SLTU: alu_ctrl_o = ALU_SLTU //SLTU
-                    `F3_XOR : alu_ctrl_o = ALU_XOR //XOR
-                    `F3_SRL : alu_ctrl_o = funct7_i ? ALU_SRA : ALU_SRL //SRL
-                    `F3_OR  : alu_ctrl_o = ALU_OR; // OR
-                    `F3_AND : alu_ctrl_o = ALU_AND; // AND
-                    default: alu_ctrl_o = ALU_ADD; // Default: ADD
+                    `F3_ADD : alu_ctrl_o = funct7_i ? `ALU_SUB : `ALU_ADD; // ADD
+                    `F3_SLL : alu_ctrl_o = `ALU_SLL; //SLL
+                    `F3_SLT : alu_ctrl_o = `ALU_SLT // SLT
+                    `F3_SLTU: alu_ctrl_o = `ALU_SLTU //SLTU
+                    `F3_XOR : alu_ctrl_o = `ALU_XOR //XOR
+                    `F3_SRL : alu_ctrl_o = funct7_i ? `ALU_SRA : `ALU_SRL //SRL
+                    `F3_OR  : alu_ctrl_o = `ALU_AND; // AND
+                    default:  alu_ctrl_o = `ALU_ADD; // Default/invalid funct3: ADD
                 endcase
             end
             2'b11: alu_ctrl_o = `ALU_PASS; // LUI
