@@ -1,4 +1,5 @@
 `timescale 1ns / 1ps
+`include "defines.v"
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
 // Engineer: 
@@ -53,6 +54,11 @@ module cpu (
     wire        zero_w;
     wire        pc_mux_sel_w;
     wire [3:0]  alu_ctrl_w;
+    wire         cf_w;
+    wire         zf_w;
+    wire         vf_w;
+    wire         sf_w;
+
 
     // Program Counter
     register #(.N(32)) pc (
@@ -65,13 +71,13 @@ module cpu (
 
     // Instruction Memory
     inst_mem inst_mem_inst (
-        .addr_i (pc_out_w[7:2]),
+        .addr_i (pc_out_w[`IR_opcode]),
         .data_o (inst_w)
     );
 
     // Control Unit
     control_unit ctrl_unit (
-        .opcode_i   (inst_w[6:2]),
+        .opcode_i   (inst_w[`IR_opcode]),
         .branch_o   (branch_w),
         .mem_rd_o (mem_read_w),
         .mem_to_reg_o(mem_to_reg_w),
@@ -85,9 +91,9 @@ module cpu (
     reg_file #(.N(32)) reg_file_inst (
         .clk      (clk),
         .rst      (rst),
-        .rd_addr1_i(inst_w[19:15]),
-        .rd_addr2_i(inst_w[24:20]),
-        .wr_addr_i(inst_w[11:7]),
+        .rd_addr1_i(inst_w[`IR_rs1]),
+        .rd_addr2_i(inst_w[`IR_rs2]),
+        .wr_addr_i(inst_w[`IR_rd]),
         .wr_en_i (reg_write_w),
         .wr_data_i(write_data_w),
         .rd_data1_o(reg_read1_w),
@@ -111,18 +117,22 @@ module cpu (
     // ALU Control
     alu_control alu_ctrl_inst (
         .alu_op_i  (alu_op_w),
-        .funct3_i  (inst_w[14:12]),
+        .funct3_i  (inst_w[`IR_funct3]),
         .funct7_i  (inst_w[30]),
         .alu_ctrl_o(alu_ctrl_w)
     );
 
     // ALU
-    alu #(.N(32)) alu_inst (
-        .a_i    (reg_read1_w),
-        .b_i    (alu_in_b_w),
-        .sel_i  (alu_ctrl_w),
-        .zero_o (zero_w),
-        .c_o    (alu_out_w)
+    alu alu_inst (
+        .a_i        (reg_read1_w),
+        .b_i        (alu_in_b_w),
+        .shamt_i    (inst_w[`IR_shamt]),   // shift amount from instruction
+        .alu_ctrl_i (alu_ctrl_w),
+        .c_o        (alu_out_w),
+        .cf_o       (cf_w),
+        .zf_o       (zf_w),
+        .vf_o       (vf_w),
+        .sf_o       (sf_w)
     );
 
     // Shift Left 1 (for branch offset)
@@ -141,7 +151,8 @@ module cpu (
     );
 
     // Next PC Mux (Branch or PC+4)
-    assign pc_mux_sel_w = branch_w & zero_w;
+    assign pc_mux_sel_w = branch_w & zf_w;
+
     nmux #(.N(32)) pc_mux (
         .a_i (pc_out_w + 32'd4),
         .b_i (pc_branch_w),
@@ -172,9 +183,9 @@ module cpu (
         case (led_sel_i)
             2'b00: inst_led_o = inst_w[15:0];
             2'b01: inst_led_o = inst_w[31:16];
-            2'b10: inst_led_o = {2'b00, branch_w, mem_read_w, mem_to_reg_w,
+            2'b10: inst_led_o = {cf_w, zf_w, vf_w, branch_w, mem_read_w, mem_to_reg_w,
                                  mem_write_w, alu_src_w, reg_write_w,
-                                 pc_mux_sel_w, zero_w, alu_op_w, alu_ctrl_w};
+                                 pc_mux_sel_w, alu_op_w, alu_ctrl_w};
             default: inst_led_o = 16'd0;
         endcase
 

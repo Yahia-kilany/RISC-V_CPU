@@ -40,31 +40,31 @@ module control_unit (
         reg_wr_o      = 1'b0;
 
         case (opcode_i)
-            5'b01100: begin // R-type
+            `OPCODE_Arith_R: begin // R-type
                 alu_op_o     = 2'b10;
                 reg_wr_o     = 1'b1;
             end
 
-            5'b00000: begin // LW
+            `OPCODE_Load: begin // LW
                 mem_rd_o     = 1'b1;
                 mem_to_reg_o = 1'b1;
                 alu_src_o    = 1'b1;
                 reg_wr_o     = 1'b1;
             end
 
-            5'b01000: begin // SW
+            `OPCODE_Store: begin // SW
                 mem_wr_o     = 1'b1;
                 alu_src_o    = 1'b1;
                 mem_to_reg_o = 1'b0; // Don't care
             end
 
-            5'b11000: begin // BEQ
+            `OPCODE_Branch: begin // BEQ
                 branch_o     = 1'b1;
                 alu_op_o     = 2'b01;
                 mem_to_reg_o = 1'b0; // Don't care
             end
 
-            default: begin // re=imposing the default values
+            default: begin // re-imposing the default values
                 branch_o      = 1'b0;
                 mem_rd_o      = 1'b0;
                 mem_to_reg_o  = 1'b0;
