@@ -23,7 +23,7 @@
 module top(input rclk, clkssd, rst, [1:0] ledSel,[3:0] ssdSel,output [15:0] instLed , [3:0] anode,[6:0] Led_out);
 wire [12:0] ssdLed;
 cpu riscv(.clk(rclk),.rst(rst), .ledSel(ledSel),.ssdSel(ssdSel), .instLed(instLed), .ssd(ssdLed));
-Four_Digit_Seven_Segment_Driver_Optimized FDSSDO(
+four_digit_seven_segment_driver FDSSDO(
     .clk(clkssd),
     .num(ssdLed),
     .Anode(anode),

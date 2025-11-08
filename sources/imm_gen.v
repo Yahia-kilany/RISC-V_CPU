@@ -25,7 +25,7 @@ module imm_gen (
 );
 
 always @(*) begin
-	case (`OPCODE)
+	case (inst_i[`IR_opcode])
 		`OPCODE_Arith_I   : 	gen_o = { {21{inst_i[31]}}, inst_i[30:25], inst_i[24:21], inst_i[20] }; // I type
 		`OPCODE_Store     :     gen_o = { {21{inst_i[31]}}, inst_i[30:25], inst_i[11:8], inst_i[7] };   // S type
 		`OPCODE_LUI       :     gen_o = { inst_i[31], inst_i[30:20], inst_i[19:12], 12'b0 };            // U type (LUI)

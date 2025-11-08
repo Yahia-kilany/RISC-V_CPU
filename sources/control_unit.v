@@ -1,5 +1,5 @@
 `timescale 1ns / 1ps
-
+`include "defines.v"
 /*******************************************************************
 *
 * Module: control_unit.v
@@ -66,13 +66,13 @@ module control_unit (
                 mem_to_reg_o = 1'b0; // Don't care
             end
             
-            OPCODE_LUI: begin // LUI 
+            `OPCODE_LUI: begin // LUI 
                 reg_wr_o = 1'b1;
                 alu_op_o = 2'b11; 
                 b_sel_o = 1'b1; 
             end 
             
-            OPCODE_AUIPC:begin //AUIPC 
+            `OPCODE_AUIPC:begin //AUIPC 
                 reg_wr_o = 1'b1; 
                 alu_op_o = 2'b00; 
                 b_sel_o = 1'b1; 

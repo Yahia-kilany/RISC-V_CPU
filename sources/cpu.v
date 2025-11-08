@@ -44,8 +44,6 @@ module cpu (
     wire [31:0] alu_out_w;
     wire [31:0] pc_branch_w;
     wire [31:0] data_read_w;
-    wire [31:0] offset_w;
-    wire        branch_w;
     wire        mem_read_w;
     wire        mem_to_reg_w;
     wire [1:0]  alu_op_w;
@@ -53,10 +51,9 @@ module cpu (
     wire        a_sel_w;
     wire        b_sel_w;
     wire        reg_write_w;
-    wire        zero_w;
     wire        pc_mux_sel_w;
     wire [3:0]  alu_ctrl_w;
-    wire        take_branch_w
+    wire        take_branch_w;
     wire         cf_w;
     wire         zf_w;
     wire         vf_w;
@@ -74,7 +71,7 @@ module cpu (
 
     // Instruction Memory
     inst_mem inst_mem_inst (
-        .addr_i (pc_out_w[`IR_opcode]),
+        .addr_i (pc_out_w[7:2]),
         .data_o (inst_w)
     );
 
@@ -86,7 +83,8 @@ module cpu (
         .mem_to_reg_o(mem_to_reg_w),
         .alu_op_o   (alu_op_w),
         .mem_wr_o(mem_write_w),
-        .alu_src_o  (b_sel_w),
+        .b_sel_o  (b_sel_w),
+        .a_sel_o  (a_sel_w),
         .reg_wr_o(reg_write_w)
     );
 
@@ -144,16 +142,12 @@ module cpu (
         .sf_o       (sf_w)
     );
 
-    // Shift Left 1 (for branch offset)
-    shift_l1 #(32) shift_imm (
-        .a_i (imm_w),
-        .b_o (offset_w)
-    );
+
 
     // Branch Address Adder
     rca #(.N(32)) offset_adder (
         .a_i   (pc_out_w),
-        .b_i   (offset_w),
+        .b_i   (imm_w),
         .c_i (1'b0),
         .c_o(),
         .s_o (pc_branch_w)
@@ -162,7 +156,7 @@ module cpu (
     assign pc_mux_sel_w = branch_w & take_branch_w;
 
     branch_control branch_control_inst( 
-        .funct3_i(inst_i[IR_funct3]),
+        .funct3_i(inst_w[`IR_funct3]),
         .zf_i(zf_w),
         .cf_i(cf_w),
         .vf_i(vf_w), 
@@ -203,7 +197,7 @@ module cpu (
             2'b01: inst_led_o = inst_w[31:16];
             2'b10: inst_led_o = {cf_w, vf_w, sf_w, zf_w, branch_w, mem_read_w, mem_to_reg_w,
                                  mem_write_w, reg_write_w, pc_mux_sel_w, alu_op_w, alu_ctrl_w};
-            2'b11: inst_led_o = {12'b0, a_sel_o, b_sel_o}
+            2'b11: inst_led_o = {12'b0, a_sel_w, b_sel_w};
             default: inst_led_o = 16'd0;
         endcase
 
@@ -216,7 +210,7 @@ module cpu (
             4'b0101: ssd_o = reg_read2_w[12:0];
             4'b0110: ssd_o = write_data_w[12:0];
             4'b0111: ssd_o = imm_w[12:0];
-            4'b1000: ssd_o = offset_w[12:0];
+            4'b1000: ssd_o = imm_w[12:0];
             4'b1001: ssd_o = alu_in_b_w[12:0];
             4'b1010: ssd_o = alu_out_w[12:0];
             4'b1011: ssd_o = data_read_w[12:0];

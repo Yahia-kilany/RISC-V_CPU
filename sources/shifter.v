@@ -29,7 +29,7 @@ module shifter (
         case(type_i)
             `ALU_SLL : c_o = a_i << shamt_i;
             `ALU_SRL : c_o = a_i >> shamt_i;
-            `ALU_SRA : c_o = $signed(r_Shift1) >>> shamt_i;
+            `ALU_SRA : c_o = $signed(a_i) >>> shamt_i;
             default:  c_o = 32'b0;
         endcase
     end
