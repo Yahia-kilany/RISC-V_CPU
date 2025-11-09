@@ -64,7 +64,9 @@ module cpu (
     wire [31:0] lsu_mem_write_data_w; // Formatted store data from LSU
     wire        lsu_mem_rd_en_w;      // Read enable from LSU
     wire        lsu_mem_wr_en_w;      // Write enable from LSU
-
+    //new wires
+    wire jump_w;
+    wire pc_to_reg_w;
 
     // Program Counter
     register #(.N(32)) pc (
@@ -91,7 +93,9 @@ module cpu (
         .mem_wr_o(mem_write_w),
         .b_sel_o  (b_sel_w),
         .a_sel_o  (a_sel_w),
-        .reg_wr_o(reg_write_w)
+        .reg_wr_o(reg_write_w),
+        .jump_o       (jump_w),      
+        .pc_to_reg_o  (pc_to_reg_w)    
     );
 
     // Register File
@@ -179,42 +183,42 @@ module cpu (
     );
 
     // Load-Store Unit instantiation
-load_store_unit lsu_inst (
-    .clk              (clk),
-    .funct3_i         (inst_w[`IR_funct3]),  // Instruction[14:12]
-    .alu_result_i     (alu_out_w),                   // Address from ALU
-    .write_data_i     (reg_read2_w),                 // Data from rs2 to store
-    .mem_read_i       (mem_read_w),                  // From control unit
-    .mem_write_i      (mem_write_w),                 // From control unit
+    load_store_unit lsu_inst (
+        .clk              (clk),
+        .funct3_i         (inst_w[`IR_funct3]),  // Instruction[14:12]
+        .alu_result_i     (alu_out_w),                   // Address from ALU
+        .write_data_i     (reg_read2_w),                 // Data from rs2 to store
+        .mem_read_i       (mem_read_w),                  // From control unit
+        .mem_write_i      (mem_write_w),                 // From control unit
     
     // To memory
-    .mem_addr_o       (lsu_mem_addr_w),              // Word address to memory
-    .mem_write_data_o (lsu_mem_write_data_w),        // Formatted write data
-    .mem_rd_en_o      (lsu_mem_rd_en_w),             // Read enable to memory
-    .mem_wr_en_o      (lsu_mem_wr_en_w),             // Write enable to memory
-    .mem_read_data_i  (data_read_w),                 // Raw data from memory
+        .mem_addr_o       (lsu_mem_addr_w),              // Word address to memory
+        .mem_write_data_o (lsu_mem_write_data_w),        // Formatted write data
+        .mem_rd_en_o      (lsu_mem_rd_en_w),             // Read enable to memory
+        .mem_wr_en_o      (lsu_mem_wr_en_w),             // Write enable to memory
+        .mem_read_data_i  (data_read_w),                 // Raw data from memory
     
     // To CPU
-    .load_data_o      (lsu_load_data_w)              // Formatted load data
-);
+        .load_data_o      (lsu_load_data_w)              // Formatted load data
+    );
 
-// Data Memory (updated instantiation)
-data_mem data_mem_inst (
-    .clk      (clk),
-    .rd_en_i  (lsu_mem_rd_en_w),       // From LSU (not mem_read_w)
-    .wr_en_i  (lsu_mem_wr_en_w),       // From LSU (not mem_write_w)
-    .addr_i   (lsu_mem_addr_w),        // From LSU (not alu_out_w[7:2])
-    .d_i      (lsu_mem_write_data_w),  // From LSU (not reg_read2_w)
-    .d_o      (data_read_w)            // To LSU
-);
+// Data Memory 
+    data_mem data_mem_inst (
+        .clk      (clk),
+        .rd_en_i  (lsu_mem_rd_en_w),       // From LSU (not mem_read_w)
+        .wr_en_i  (lsu_mem_wr_en_w),       // From LSU (not mem_write_w)
+        .addr_i   (lsu_mem_addr_w),        // From LSU (not alu_out_w[7:2])
+        .d_i      (lsu_mem_write_data_w),  // From LSU (not reg_read2_w)
+        .d_o      (data_read_w)            // To LSU
+    );
 
     // Write Back Mux (ALU or Memory)
-    nmux #(.N(32)) mem_to_reg_mux (
-        .a_i (alu_out_w),
-        .b_i (data_read_w),
-        .s_i (mem_to_reg_w),
-        .c_o (write_data_w)
-    );
+nmux #(.N(32)) mem_to_reg_mux (
+    .a_i (alu_out_w),
+    .b_i (lsu_load_data_w),    // Use formatted load data 
+    .s_i (mem_to_reg_w),
+    .c_o (write_data_w)
+);
 
     // LED and 7-Segment Display
     always @(*) begin
