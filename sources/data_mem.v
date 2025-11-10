@@ -20,13 +20,13 @@ module data_mem (
     input  wire        clk,      // Core clock
     input  wire        rd_en_i,  // Read enable
     input  wire        wr_en_i,  // Write enable
-    input  wire [5:0]  addr_i,   // 6-bit word address
+    input  wire [7:0]  addr_i,   // 6-bit word address
     input  wire [31:0] d_i,      // Write data
     output wire [31:0] d_o       // Read data
 );
 
     // 64 × 32-bit memory array
-    reg [31:0] mem_arr [0:63];
+    reg [31:0] mem_arr [0:127];
 
     // Asynchronous read
     assign d_o = (rd_en_i) ? mem_arr[addr_i] : 32'd0;

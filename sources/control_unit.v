@@ -28,7 +28,9 @@ module control_unit (
     output reg        mem_wr_o,      // Memory write enable
     output reg        a_sel_o,       // ALU input a select
     output reg        b_sel_o,       // ALU input b select
-    output reg        reg_wr_o       // Register write enable
+    output reg        reg_wr_o,       // Register write enable
+    output reg        jump_o,        // Jump control (for JAL/JALR)
+    output reg        pc_to_reg_o    // Write PC+4 to register
 );
 
     always @(*) begin
@@ -46,7 +48,14 @@ module control_unit (
                 alu_op_o     = 2'b10;
                 reg_wr_o     = 1'b1;
             end
-
+            
+            `OPCODE_Arith_I: begin // I-type arithmetic (ADDI, SLTI, SLTIU, XORI, ORI, ANDI, SLLI, SRLI, SRAI)
+                alu_op_o     = 2'b10;  // Let ALU control decode funct3/funct7
+                b_sel_o      = 1'b1;   // Select immediate
+                reg_wr_o     = 1'b1;
+                a_sel_o      = 1'b0;   // rs1
+            end
+            
             `OPCODE_Load: begin // LW
                 mem_rd_o     = 1'b1;
                 mem_to_reg_o = 1'b1;
@@ -78,7 +87,21 @@ module control_unit (
                 b_sel_o = 1'b1; 
                 a_sel_o = 1'b1; 
             end
-
+            
+            `OPCODE_SYSTEM: begin // SYSTEM instructions (ECALL, EBREAK)
+                alu_op_o     = 2'b00;
+            end
+            
+            `OPCODE_JAL: begin // JAL (Jump and Link)
+                jump_o       = 1'b1;
+                reg_wr_o     = 1'b1;
+                pc_to_reg_o  = 1'b1;   
+                b_sel_o      = 1'b1;   // Immediate
+                alu_op_o     = 2'b00;  // ADD for target address (PC + imm)
+                a_sel_o      = 1'b1;   // PC
+            end
+            
+            
             default: begin // re-imposing the default values
                 branch_o      = 1'b0;
                 mem_rd_o      = 1'b0;

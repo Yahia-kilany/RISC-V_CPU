@@ -191,13 +191,13 @@ module cpu (
         .take_branch_o(take_branch_w) 
     );
 
-    // Next PC Mux (Branch or PC+4)
-    nmux #(.N(32)) pc_mux (
-        .a_i (pc_out_w + 32'd4),
-        .b_i (pc_branch_w),
-        .s_i (pc_mux_sel_w),
-        .c_o (pc_in_w)
-    );
+//    // Next PC Mux (Branch or PC+4)
+//    nmux #(.N(32)) pc_mux (
+//        .a_i (pc_out_w + 32'd4),
+//        .b_i (pc_branch_w),
+//        .s_i (pc_mux_sel_w),
+//        .c_o (pc_in_w)
+//    );
 
     // Load-Store Unit instantiation
     load_store_unit lsu_inst (
