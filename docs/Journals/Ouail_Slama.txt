@@ -1,0 +1,22 @@
+RISC-V CPU Implementation Journal
+11/08/25
+1. Control Unit
+- Extended to support complete RV32I instruction set (I-type, U-type, J-type)
+- Added control signals for jumps and operand selection
+2. Load-Store Unit (LSU)
+- Designed LSU module for byte/halfword/word memory operations
+- Implemented Read-Modify-Write logic for partial stores
+- Added sign/zero extension for loads
+3. Datapath Modifications
+- Added two-stage writeback mux (ALU/Memory → PC+4 selection)
+- Added PC target mux for branch/jump selection
+- Integrated LSU between CPU and memory
+11/9/25
+4. Block Diagram
+- Completed the block diagram and added relevant muxes and new control signals
+11/10/25
+5. JAL/JALR Support
+- Implemented jump instructions with PC+4 return address writeback
+6. Testing
+- Generated comprehensive assembly test programs for all instruction types
+
