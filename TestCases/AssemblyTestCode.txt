@@ -1,0 +1,40 @@
+        # Base values and immediate instructions
+    LUI    x1, 0x12345            # x1 = 0x12345000 (U-type)
+    AUIPC  x2, 0x100              # x2 = PC + 0x10000 (U-type)
+    ADDI   x3, x0, 10             # x3 = 10 (I-type immediate)
+    ANDI   x4, x3, 15             # x4 = x3 & 15 (I-type)
+    ORI    x5, x3, 240            # x5 = x3 | 0xF0 (I-type)
+    XORI   x6, x5, 255            # x6 = x5 ^ 0xFF (I-type)
+
+    # R-type arithmetic and logic instructions
+    ADD    x7, x1, x2             # x7 = x1 + x2
+    SUB    x8, x7, x3             # x8 = x7 - x3
+    AND    x9, x4, x5             # x9 = x4 & x5
+    OR     x10, x5, x6            # x10 = x5 | x6
+    XOR    x11, x6, x7            # x11 = x6 ^ x7
+    SLL    x12, x1, x3            # x12 = x1 << (x3 & 31)
+    SRL    x13, x2, x4            # x13 = x2 >> (x4 & 31)
+    SRA    x14, x7, x5            # x14 = x7 >>>(x5 & 31)
+    SLT    x15, x3, x7            # x15 = x3 < x7 ? 1 : 0
+    SLTU   x16, x3, x7            # x16 = unsigned(x3) < unsigned(x7) ? 1 : 0
+    # Load and Store instructions
+    SW     x7, 8(x0)              # Store word x7 at memory[8]
+    LW     x17, 8(x0)             # Load word from memory[8] into x17
+    SB     x1, 12(x0)             # Store byte of x1 at memory[12]
+    LB     x18, 12(x0)            # Load byte (sign-extended) from memory[12]
+    SH     x2, 16(x0)             # Store halfword of x2 at memory[16]
+    LH     x19, 16(x0)            # Load halfword (sign-extended) from memory[16]
+    LBU    x20, 12(x0)            # Load byte unsigned from memory[12]
+    LHU    x21, 16(x0)            # Load halfword unsigned from memory[16]
+    # Branch instructions
+    BEQ    x15, x0, bom # Branch if equal
+    ADDI   x22, x0, 999           # Should be skipped if branch taken
+    JAL    x23, afterbranch
+    ECALL
+bom:
+    ADDI   x22, x0, 123           # Executed if branch taken
+
+afterbranch:
+	JALR   x24, 0(x23)            # Jump to address in x23
+    
+.data

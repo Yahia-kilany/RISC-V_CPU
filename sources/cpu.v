@@ -6,7 +6,7 @@
 // 
 // Create Date: 09/30/2025 01:39:16 PM
 // Design Name: 
-// Module Name: DFlipFlop
+// Module Name: CPU
 // Project Name: 
 // Target Devices: 
 // Tool Versions: 
@@ -20,8 +20,6 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
-
-
 module cpu (
     input  wire        clk,
     input  wire        rst,
@@ -31,116 +29,104 @@ module cpu (
     output reg  [12:0] ssd_o
 );
 
-    // Internal Signals
-    wire [31:0] pc_in_w;
-    wire [31:0] pc_out_w;
+
+    
+
+
+    // --- Internal Wires ---
+    wire [31:0] pc_in_w, pc_out_w;
     wire [31:0] inst_w;
-    wire [31:0] write_data_w;
-    wire [31:0] reg_read1_w;
-    wire [31:0] reg_read2_w;
+
+    wire [31:0] reg_read1_w, reg_read2_w;
+    wire [31:0] alu_in_a_w, alu_in_b_w, alu_out_w;
     wire [31:0] imm_w;
-    wire [31:0] alu_in_b_w;
-    wire [31:0] alu_in_a_w;
-    wire [31:0] alu_out_w;
-    wire [31:0] pc_branch_w;
-    wire [31:0] data_read_w;
-    wire        mem_read_w;
-    wire        mem_to_reg_w;
-    wire [1:0]  alu_op_w;
-    wire        mem_write_w;
-    wire        a_sel_w;
-    wire        b_sel_w;
-    wire        reg_write_w;
+
+    wire [31:0] pc_plus_four_w, pc_branch_w, pc_target_w;
+    wire        pc_write_en_w, jump_w, pc_to_reg_w, branch_w, take_branch_w;
     wire        pc_mux_sel_w;
+
+    wire        reg_write_w, a_sel_w, b_sel_w;
+    wire [1:0]  alu_op_w;
     wire [3:0]  alu_ctrl_w;
-    wire        take_branch_w;
-    wire         cf_w;
-    wire         zf_w;
-    wire         vf_w;
-    wire         sf_w;
-    // LSU wires
-    wire [31:0] lsu_load_data_w;      // Formatted load data from LSU
-    wire [7:0]  lsu_mem_addr_w;       // Memory address from LSU
-    wire [31:0] lsu_mem_write_data_w; // Formatted store data from LSU
-    wire        lsu_mem_rd_en_w;      // Read enable from LSU
-    wire        lsu_mem_wr_en_w;      // Write enable from LSU
-    //new wires
-    wire jump_w;
-    wire pc_to_reg_w;
-    wire [31:0] writeback_data_w;  // NEW: final writeback data
-    wire [31:0] pc_target_w;       // NEW: selected target (branch or jump)
-    // Program Counter
+    wire        cf_w, zf_w, vf_w, sf_w;
+
+    wire        mem_read_w, mem_write_w, mem_to_reg_w;
+
+    // LSU to Data Memory control signals
+    wire [7:0]  mem_addr_w;
+    wire [31:0] mem_wr_data_w;
+    wire [2:0]  load_type_w;
+    wire [1:0] store_type_w;
+
+    // Data memory output
+    wire [31:0] mem_read_data_w;
+
+    // Writeback wires
+    wire [31:0] write_data_w, writeback_data_w;
+
+
+
+    assign mem_addr_w = alu_out_w[7:0];
+    assign mem_wr_data_w = reg_read2_w;
+    
+    
+    // --- Program Counter ---
     register #(.N(32)) pc (
-        .clk (clk),
-        .rst (rst),
-        .wr_en_i(1'b1),
-        .d_i   (pc_in_w),
-        .d_o   (pc_out_w)
+        .clk      (clk),
+        .rst      (rst),
+        .wr_en_i  (pc_write_en_w),
+        .d_i      (pc_in_w),
+        .d_o      (pc_out_w)
     );
 
-    // Instruction Memory
+    // --- Instruction Memory ---
     inst_mem inst_mem_inst (
-        .addr_i (pc_out_w[7:2]),
+        .addr_i (pc_out_w[9:2]),
         .data_o (inst_w)
     );
 
-    // Control Unit
+    // --- Control Unit ---
     control_unit ctrl_unit (
-        .opcode_i   (inst_w[`IR_opcode]),
-        .branch_o   (branch_w),
-        .mem_rd_o (mem_read_w),
-        .mem_to_reg_o(mem_to_reg_w),
-        .alu_op_o   (alu_op_w),
-        .mem_wr_o(mem_write_w),
-        .b_sel_o  (b_sel_w),
-        .a_sel_o  (a_sel_w),
-        .reg_wr_o(reg_write_w),
-        .jump_o       (jump_w),      
-        .pc_to_reg_o  (pc_to_reg_w)    
+        .opcode_i      (inst_w[`IR_opcode]),
+        .branch_o      (branch_w),
+        .mem_rd_o      (mem_read_w),
+        .mem_to_reg_o  (mem_to_reg_w),
+        .alu_op_o      (alu_op_w),
+        .mem_wr_o      (mem_write_w),
+        .b_sel_o       (b_sel_w),
+        .a_sel_o       (a_sel_w),
+        .reg_wr_o      (reg_write_w),
+        .jump_o        (jump_w),
+        .pc_to_reg_o   (pc_to_reg_w),
+        .pc_wr_en_o    (pc_write_en_w)
     );
 
-    // Register File
+    // --- Register File ---
     reg_file #(.N(32)) reg_file_inst (
-        .clk      (clk),
-        .rst      (rst),
-        .rd_addr1_i(inst_w[`IR_rs1]),
-        .rd_addr2_i(inst_w[`IR_rs2]),
-        .wr_addr_i(inst_w[`IR_rd]),
-        .wr_en_i (reg_write_w),
-        .wr_data_i(writeback_data_w),
-        .rd_data1_o(reg_read1_w),
-        .rd_data2_o(reg_read2_w)
+        .clk        (clk),
+        .rst        (rst),
+        .rd_addr1_i (inst_w[`IR_rs1]),
+        .rd_addr2_i (inst_w[`IR_rs2]),
+        .wr_addr_i  (inst_w[`IR_rd]),
+        .wr_en_i    (reg_write_w),
+        .wr_data_i  (writeback_data_w),
+        .rd_data1_o (reg_read1_w),
+        .rd_data2_o (reg_read2_w)
     );
-    
-    
-    // PC Target Mux (branch vs jump)
-    nmux #(.N(32)) pc_target_mux (
-        .a_i (pc_branch_w),
-        .b_i (alu_out_w),     // Jump target from ALU
-        .s_i (jump_w),
-        .c_o (pc_target_w)
-    );
-    
-    //Updated pc mux
-    nmux #(.N(32)) pc_mux (
-    .a_i (pc_out_w + 32'd4),
-    .b_i (pc_target_w),          // Changed from pc_branch_w
-    .s_i (pc_mux_sel_w | jump_w), // Changed to include jump
-    .c_o (pc_in_w)
-);
-    // Immediate Generator
+
+    // --- Immediate Generator ---
     imm_gen imm_gen_inst (
         .inst_i (inst_w),
         .gen_o  (imm_w)
     );
-    // ALU Input a Mux
+
+    // --- ALU Input Muxes ---
     nmux #(.N(32)) alu_a_mux (
         .a_i (reg_read1_w),
         .b_i (pc_out_w),
         .s_i (a_sel_w),
         .c_o (alu_in_a_w)
     );
-    // ALU Input b Mux
     nmux #(.N(32)) alu_b_mux (
         .a_i (reg_read2_w),
         .b_i (imm_w),
@@ -148,7 +134,7 @@ module cpu (
         .c_o (alu_in_b_w)
     );
 
-    // ALU Control
+    // --- ALU Control ---
     alu_control alu_ctrl_inst (
         .alu_op_i  (alu_op_w),
         .funct3_i  (inst_w[`IR_funct3]),
@@ -156,11 +142,11 @@ module cpu (
         .alu_ctrl_o(alu_ctrl_w)
     );
 
-    // ALU
+    // --- ALU ---
     alu alu_inst (
         .a_i        (alu_in_a_w),
         .b_i        (alu_in_b_w),
-        .shamt_i    (inst_w[`IR_shamt]),   // shift amount from instruction
+        .shamt_i    (inst_w[`IR_shamt]),
         .alu_ctrl_i (alu_ctrl_w),
         .c_o        (alu_out_w),
         .cf_o       (cf_w),
@@ -169,95 +155,98 @@ module cpu (
         .sf_o       (sf_w)
     );
 
-
-
-    // Branch Address Adder
+    // --- Branch Address Adders ---
     rca #(.N(32)) offset_adder (
         .a_i   (pc_out_w),
         .b_i   (imm_w),
-        .c_i (1'b0),
-        .c_o(),
-        .s_o (pc_branch_w)
+        .c_i   (1'b0),
+        .c_o   (),
+        .s_o   (pc_branch_w)
     );
-
+    rca #(.N(32)) following_pc_adder (
+        .a_i   (pc_out_w),
+        .b_i   (32'd4),
+        .c_i   (1'b0),
+        .c_o   (),
+        .s_o   (pc_plus_four_w)
+    );
     assign pc_mux_sel_w = branch_w & take_branch_w;
 
-    branch_control branch_control_inst( 
+    branch_control branch_control_inst(
         .funct3_i(inst_w[`IR_funct3]),
         .zf_i(zf_w),
         .cf_i(cf_w),
-        .vf_i(vf_w), 
-        .sf_i(sf_w), 
-        .take_branch_o(take_branch_w) 
+        .vf_i(vf_w),
+        .sf_i(sf_w),
+        .take_branch_o(take_branch_w)
     );
 
-//    // Next PC Mux (Branch or PC+4)
-//    nmux #(.N(32)) pc_mux (
-//        .a_i (pc_out_w + 32'd4),
-//        .b_i (pc_branch_w),
-//        .s_i (pc_mux_sel_w),
-//        .c_o (pc_in_w)
-//    );
+    // --- PC Target muxes ---
+    nmux #(.N(32)) pc_target_mux (
+        .a_i (pc_branch_w),
+        .b_i (alu_out_w),      // Jump target from ALU
+        .s_i (jump_w),
+        .c_o (pc_target_w)
+    );
 
-    // Load-Store Unit instantiation
+    nmux #(.N(32)) pc_mux (
+        .a_i (pc_plus_four_w),
+        .b_i (pc_target_w),
+        .s_i (pc_mux_sel_w | jump_w),
+        .c_o (pc_in_w)
+    );
+
+    // --- Load-Store Unit ---
     load_store_unit lsu_inst (
-        .clk              (clk),
-        .funct3_i         (inst_w[`IR_funct3]),  // Instruction[14:12]
-        .alu_result_i     (alu_out_w),                   // Address from ALU
-        .write_data_i     (reg_read2_w),                 // Data from rs2 to store
-        .mem_read_i       (mem_read_w),                  // From control unit
-        .mem_write_i      (mem_write_w),                 // From control unit
-    
-    // To memory
-        .mem_addr_o       (lsu_mem_addr_w),              // Word address to memory
-        .mem_write_data_o (lsu_mem_write_data_w),        // Formatted write data
-        .mem_rd_en_o      (lsu_mem_rd_en_w),             // Read enable to memory
-        .mem_wr_en_o      (lsu_mem_wr_en_w),             // Write enable to memory
-        .mem_read_data_i  (data_read_w),                 // Raw data from memory
-    
-    // To CPU
-        .load_data_o      (lsu_load_data_w)              // Formatted load data
+        .funct3_i       (inst_w[`IR_funct3]),
+        .load_type_o      (load_type_w),
+        .store_type_o     (store_type_w)
     );
 
-    // Data Memory 
+    // --- Data Memory ---
     data_mem data_mem_inst (
-        .clk      (clk),
-        .rd_en_i  (lsu_mem_rd_en_w),       // From LSU (not mem_read_w)
-        .wr_en_i  (lsu_mem_wr_en_w),       // From LSU (not mem_write_w)
-        .addr_i   (lsu_mem_addr_w),        // From LSU (not alu_out_w[7:2])
-        .d_i      (lsu_mem_write_data_w),  // From LSU (not reg_read2_w)
-        .d_o      (data_read_w)            // To LSU
+        .clk           (clk),
+        .rd_en_i       (mem_read_w),
+        .wr_en_i       (mem_write_w),
+        .addr_i        (mem_addr_w),
+        .wr_data_i     (mem_wr_data_w),
+        .store_type_i    (store_type_w),
+        .load_type_i     (load_type_w),
+        .rd_data_o   (mem_read_data_w)
     );
 
+    // --- Writeback mux: ALU output or memory data ---
+    nmux #(.N(32)) mem_to_reg_mux (
+        .a_i (alu_out_w),
+        .b_i (mem_read_data_w),
+        .s_i (mem_to_reg_w),
+        .c_o (write_data_w)
+    );
+
+    // --- PC to Reg mux for JAL/JALR ---
     nmux #(.N(32)) pc_to_reg_mux (
-    .a_i (write_data_w),       // Normal writeback
-    .b_i (pc_out_w + 32'd4),   // PC+4 for JAL/JALR
-    .s_i (pc_to_reg_w),
-    .c_o (writeback_data_w)
-);
+        .a_i (write_data_w),
+        .b_i (pc_plus_four_w),
+        .s_i (pc_to_reg_w),
+        .c_o (writeback_data_w)
+    );
 
-    // Write Back Mux (ALU or Memory)
-nmux #(.N(32)) mem_to_reg_mux (
-    .a_i (alu_out_w),
-    .b_i (lsu_load_data_w),    // Use formatted load data 
-    .s_i (mem_to_reg_w),
-    .c_o (write_data_w)
-);
-
-    // LED and 7-Segment Display
+    // --- LED & 7-Segment Displays ---
     always @(*) begin
         case (led_sel_i)
             2'b00: inst_led_o = inst_w[15:0];
             2'b01: inst_led_o = inst_w[31:16];
-            2'b10: inst_led_o = {cf_w, vf_w, sf_w, zf_w, branch_w, mem_read_w, mem_to_reg_w,
-                                 mem_write_w, reg_write_w, pc_mux_sel_w, alu_op_w, alu_ctrl_w};
+            2'b10: inst_led_o = {cf_w, vf_w, sf_w, zf_w,
+                                 branch_w, mem_read_w, mem_to_reg_w,
+                                 mem_write_w, reg_write_w,
+                                 pc_mux_sel_w, alu_op_w, alu_ctrl_w};
             2'b11: inst_led_o = {12'b0, a_sel_w, b_sel_w};
             default: inst_led_o = 16'd0;
         endcase
 
         case (ssd_sel_i)
             4'b0000: ssd_o = pc_out_w[12:0];
-            4'b0001: ssd_o = pc_out_w[12:0] + 13'd4;
+            4'b0001: ssd_o = pc_plus_four_w[12:0];
             4'b0010: ssd_o = pc_branch_w[12:0];
             4'b0011: ssd_o = pc_in_w[12:0];
             4'b0100: ssd_o = reg_read1_w[12:0];
@@ -267,11 +256,9 @@ nmux #(.N(32)) mem_to_reg_mux (
             4'b1000: ssd_o = imm_w[12:0];
             4'b1001: ssd_o = alu_in_b_w[12:0];
             4'b1010: ssd_o = alu_out_w[12:0];
-            4'b1011: ssd_o = data_read_w[12:0];
+            4'b1011: ssd_o = mem_read_data_w[12:0];
             default: ssd_o = 13'd0;
         endcase
     end
-
-        
 
 endmodule

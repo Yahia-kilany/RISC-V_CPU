@@ -16,7 +16,7 @@
 *   10/07/2025 – Initial lab version created
 *   11/02/2025 – Adapted and cleaned for project use (Yahia)
 *   11/08/2025 - Added support for B-type and U-type (Yahia)
-*
+*   11/09/2025 - Added support for I-type, JAL, and sys calls (Ouail)
 *******************************************************************/
 
 module control_unit (
@@ -30,7 +30,8 @@ module control_unit (
     output reg        b_sel_o,       // ALU input b select
     output reg        reg_wr_o,       // Register write enable
     output reg        jump_o,        // Jump control (for JAL/JALR)
-    output reg        pc_to_reg_o    // Write PC+4 to register
+    output reg        pc_to_reg_o,    // Write PC+4 to register
+    output reg        pc_wr_en_o
 );
 
     always @(*) begin
@@ -43,6 +44,9 @@ module control_unit (
         b_sel_o       = 1'b0;
         reg_wr_o      = 1'b0;
         a_sel_o       = 1'b0;
+        pc_wr_en_o    = 1'b1;
+        jump_o = 1'b0;
+        pc_to_reg_o = 1'b0;
         case (opcode_i)
             `OPCODE_Arith_R: begin // R-type
                 alu_op_o     = 2'b10;
@@ -89,7 +93,17 @@ module control_unit (
             end
             
             `OPCODE_SYSTEM: begin // SYSTEM instructions (ECALL, EBREAK)
-                alu_op_o     = 2'b00;
+                pc_wr_en_o = 1'b0;
+                branch_o      = 1'b0;
+                mem_rd_o      = 1'b0;
+                mem_to_reg_o  = 1'b0;
+                alu_op_o      = 2'b00;
+                mem_wr_o      = 1'b0;
+                a_sel_o       = 1'b0;
+                b_sel_o       = 1'b0;
+                reg_wr_o      = 1'b0;
+//                pc_wr_en_o = 1'b0;
+                
             end
             
             `OPCODE_JAL: begin // JAL (Jump and Link)
@@ -111,7 +125,9 @@ module control_unit (
                 a_sel_o       = 1'b0;
                 b_sel_o       = 1'b0;
                 reg_wr_o      = 1'b0;
-
+                pc_wr_en_o = 1'b1;
+                jump_o = 1'b0;
+                pc_to_reg_o = 1'b0;
             end
         endcase
     end

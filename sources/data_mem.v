@@ -17,31 +17,51 @@
 *******************************************************************/
 
 module data_mem (
-    input  wire        clk,      // Core clock
-    input  wire        rd_en_i,  // Read enable
-    input  wire        wr_en_i,  // Write enable
-    input  wire [7:0]  addr_i,   // 6-bit word address
-    input  wire [31:0] d_i,      // Write data
-    output wire [31:0] d_o       // Read data
+    input  wire        clk,
+    input  wire        rd_en_i,
+    input  wire        wr_en_i,
+    input  wire [7:0] addr_i,      // byte address
+    input  wire [31:0] wr_data_i,
+    input  wire [2:0]  load_type_i,   // LB/LBU/LH/LHU
+    input  wire [1:0]  store_type_i,  // SB/SH/SW
+    output reg  [31:0] rd_data_o
 );
 
-    // 64 × 32-bit memory array
-    reg [31:0] mem_arr [0:127];
+    reg [7:0] mem [0:255]; // example 1KB memory
 
-    // Asynchronous read
-    assign d_o = (rd_en_i) ? mem_arr[addr_i] : 32'd0;
-
-    // Synchronous write
-    always @(posedge clk) begin
-        if (wr_en_i)
-            mem_arr[addr_i] <= d_i;
+    // Read
+    always @(*) begin
+        if (rd_en_i) begin
+            case (load_type_i)
+                3'b000: rd_data_o = {{24{mem[addr_i][7]}}, mem[addr_i]};           // LB
+                3'b001: rd_data_o = {24'b0, mem[addr_i]};                          // LBU
+                3'b010: rd_data_o = {{16{mem[addr_i+1][7]}}, mem[addr_i+1], mem[addr_i]}; // LH
+                3'b011: rd_data_o = {16'b0, mem[addr_i+1], mem[addr_i]};           // LHU
+                3'b100: rd_data_o = {mem[addr_i+3], mem[addr_i+2], mem[addr_i+1], mem[addr_i]};           // LW
+                default: rd_data_o = {mem[addr_i+3], mem[addr_i+2], mem[addr_i+1], mem[addr_i]}; // default LW
+            endcase
+        end else begin
+            rd_data_o = 32'b0;
+        end
     end
 
-    // Optional: memory initialization
-    initial begin
-        mem_arr[0] = 32'd17;
-        mem_arr[1] = 32'd9;
-        mem_arr[2] = 32'd25;
+    // Write
+    always @(posedge clk) begin
+        if (wr_en_i) begin
+            case (store_type_i)
+                2'b00: mem[addr_i] <= wr_data_i[7:0];                // SB
+                2'b01: begin                                        // SH
+                    mem[addr_i]   <= wr_data_i[7:0];
+                    mem[addr_i+1] <= wr_data_i[15:8];
+                end
+                2'b10: begin                                        // SW
+                    mem[addr_i]   <= wr_data_i[7:0];
+                    mem[addr_i+1] <= wr_data_i[15:8];
+                    mem[addr_i+2] <= wr_data_i[23:16];
+                    mem[addr_i+3] <= wr_data_i[31:24];
+                end
+            endcase
+        end
     end
 
 endmodule
