@@ -67,7 +67,8 @@ module cpu (
     //new wires
     wire jump_w;
     wire pc_to_reg_w;
-
+    wire [31:0] writeback_data_w;  // NEW: final writeback data
+    wire [31:0] pc_target_w;       // NEW: selected target (branch or jump)
     // Program Counter
     register #(.N(32)) pc (
         .clk (clk),
@@ -106,11 +107,27 @@ module cpu (
         .rd_addr2_i(inst_w[`IR_rs2]),
         .wr_addr_i(inst_w[`IR_rd]),
         .wr_en_i (reg_write_w),
-        .wr_data_i(write_data_w),
+        .wr_data_i(writeback_data_w),
         .rd_data1_o(reg_read1_w),
         .rd_data2_o(reg_read2_w)
     );
-
+    
+    
+    // PC Target Mux (branch vs jump)
+    nmux #(.N(32)) pc_target_mux (
+        .a_i (pc_branch_w),
+        .b_i (alu_out_w),     // Jump target from ALU
+        .s_i (jump_w),
+        .c_o (pc_target_w)
+    );
+    
+    //Updated pc mux
+    nmux #(.N(32)) pc_mux (
+    .a_i (pc_out_w + 32'd4),
+    .b_i (pc_target_w),          // Changed from pc_branch_w
+    .s_i (pc_mux_sel_w | jump_w), // Changed to include jump
+    .c_o (pc_in_w)
+);
     // Immediate Generator
     imm_gen imm_gen_inst (
         .inst_i (inst_w),
@@ -202,7 +219,7 @@ module cpu (
         .load_data_o      (lsu_load_data_w)              // Formatted load data
     );
 
-// Data Memory 
+    // Data Memory 
     data_mem data_mem_inst (
         .clk      (clk),
         .rd_en_i  (lsu_mem_rd_en_w),       // From LSU (not mem_read_w)
@@ -211,6 +228,13 @@ module cpu (
         .d_i      (lsu_mem_write_data_w),  // From LSU (not reg_read2_w)
         .d_o      (data_read_w)            // To LSU
     );
+
+    nmux #(.N(32)) pc_to_reg_mux (
+    .a_i (write_data_w),       // Normal writeback
+    .b_i (pc_out_w + 32'd4),   // PC+4 for JAL/JALR
+    .s_i (pc_to_reg_w),
+    .c_o (writeback_data_w)
+);
 
     // Write Back Mux (ALU or Memory)
 nmux #(.N(32)) mem_to_reg_mux (
@@ -247,5 +271,7 @@ nmux #(.N(32)) mem_to_reg_mux (
             default: ssd_o = 13'd0;
         endcase
     end
+
+        
 
 endmodule
