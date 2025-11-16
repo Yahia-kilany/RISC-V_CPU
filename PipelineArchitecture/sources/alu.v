@@ -46,7 +46,7 @@ module alu(
     
     // Shifter
     wire[31:0] sh_w;
-    shifter shifter0(.a_i(a_i), .shamt_i(shamt_i), .type_i(alu_ctrl_i[1:0]),  .c_o(sh_w));
+    shifter shifter0(.a_i(a_i), .shamt_i(shamt_i), .type_i(alu_ctrl_i),  .c_o(sh_w));
 
     // ALU operation select
     always @(*) begin

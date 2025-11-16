@@ -64,11 +64,7 @@ module cpu (
     // Writeback wires
     wire [31:0] write_data_w, writeback_data_w;
 
-
-
-    assign mem_addr_w = alu_out_w[7:0];
-    assign mem_wr_data_w = reg_read2_w;
-    // ===============================
+// ===============================
 // IF/ID PIPELINE REGISTER
 // ===============================
 
@@ -92,19 +88,20 @@ register #(.N(64)) if_id_reg (
 
 // Wires
 wire [31:0] id_ex_pc_w, id_ex_reg1_w, id_ex_reg2_w, id_ex_imm_w;
-wire [7:0]  id_ex_ctrl_w;
+wire [11:0]  id_ex_ctrl_w;
 wire [3:0]  id_ex_func_w;
 wire [4:0]  id_ex_rs1_w, id_ex_rs2_w, id_ex_rd_w;
 
-// 155-bit pipeline register
-register #(.N(155)) id_ex_reg (
+// 159-bit pipeline register
+register #(.N(159)) id_ex_reg (
     .clk     (clk),
     .rst     (rst),
     .wr_en_i (1'b1),
     .d_i     ({
-                {branch_w, mem_to_reg_w, reg_write_w,
-                 mem_write_w, mem_read_w, alu_op_w, b_sel_w},
-
+                {pc_write_en_w, mem_to_reg_w, pc_to_reg_w, reg_write_w
+                    ,branch_w, mem_read_w,mem_write_w,jump_w,
+                    b_sel_w,a_sel_w,alu_op_w},   
+                    
                 if_id_pc_w,
                 reg_read1_w,
                 reg_read2_w,
@@ -135,30 +132,39 @@ register #(.N(155)) id_ex_reg (
 // ===============================
 
 // Wires
-wire [31:0] ex_mem_branch_addr_w, ex_mem_alu_out_w, ex_mem_reg2_w;
-wire [4:0]  ex_mem_ctrl_w, ex_mem_rd_w;
-wire        ex_mem_zero_w;
-
-// 107-bit pipeline register
-register #(.N(107)) ex_mem_reg (
+wire [31:0] ex_mem_branch_addr_w, ex_mem_alu_out_w, ex_mem_reg2_w,ex_mem_pc_w;
+wire [7:0]  ex_mem_ctrl_w;
+wire [4:0] ex_mem_rd_w;
+wire        ex_mem_take_branch_w;
+wire [2:0]  ex_mem_load_type_w;
+wire [1:0]  ex_mem_store_type_w;
+                
+// 147-bit pipeline register
+register #(.N(147)) ex_mem_reg (
     .clk     (clk),
     .rst     (rst),
     .wr_en_i (1'b1),
     .d_i     ({
-                id_ex_ctrl_w[7:3],  // ctrl subset
+                id_ex_ctrl_w[11:4],  // ctrl subset
                 pc_branch_w,
-                zf_w,
+                take_branch_w,
                 alu_out_w,
                 id_ex_reg2_w,
-                id_ex_rd_w
+                id_ex_rd_w,
+                load_type_w,
+                store_type_w,
+                id_ex_pc_w
              }),
     .d_o     ({
                 ex_mem_ctrl_w,
                 ex_mem_branch_addr_w,
-                ex_mem_zero_w,
+                ex_mem_take_branch_w,
                 ex_mem_alu_out_w,
                 ex_mem_reg2_w,
-                ex_mem_rd_w
+                ex_mem_rd_w,
+                ex_mem_load_type_w,
+                ex_mem_store_type_w,
+                ex_mem_pc_w
              })
 );
 
@@ -169,28 +175,38 @@ register #(.N(107)) ex_mem_reg (
 // ===============================
 
 // Wires
-wire [31:0] mem_wb_mem_data_w, mem_wb_alu_out_w;
-wire [2:0]  mem_wb_ctrl_w;
+wire [31:0] mem_wb_mem_data_w, mem_wb_alu_out_w,mem_wb_pc;
+wire [3:0]  mem_wb_ctrl_w;
 wire [4:0]  mem_wb_rd_w;
 
-// 72-bit pipeline register
-register #(.N(72)) mem_wb_reg (
+
+// 105-bit pipeline register
+register #(.N(105)) mem_wb_reg (
     .clk     (clk),
     .rst     (rst),
     .wr_en_i (1'b1),
     .d_i     ({
-                ex_mem_ctrl_w[4:2],
+                ex_mem_ctrl_w[7:4],
                 mem_read_data_w,
                 ex_mem_alu_out_w,
-                ex_mem_rd_w
+                ex_mem_rd_w,
+                pc_plus_four_w
              }),
     .d_o     ({
                 mem_wb_ctrl_w,
                 mem_wb_mem_data_w,
                 mem_wb_alu_out_w,
-                mem_wb_rd_w
+                mem_wb_rd_w,
+                mem_wb_pc
              })
 );
+     rca #(.N(32)) following_pc_adder (
+        .a_i   (pc_out_w),
+        .b_i   (32'd4),
+        .c_i   (1'b0),
+        .c_o   (),
+        .s_o   (pc_plus_four_w)
+    );
 
 
 
@@ -200,7 +216,7 @@ register #(.N(72)) mem_wb_reg (
     register #(.N(32)) pc (
         .clk      (clk),
         .rst      (rst),
-        .wr_en_i  (pc_write_en_w),
+        .wr_en_i  (1'b1),
         .d_i      (pc_in_w),
         .d_o      (pc_out_w)
     );
@@ -213,7 +229,7 @@ register #(.N(72)) mem_wb_reg (
 
     // --- Control Unit ---
     control_unit ctrl_unit (
-        .opcode_i      (inst_w[`IR_opcode]),
+        .opcode_i      (if_id_inst_w[`IR_opcode]),
         .branch_o      (branch_w),
         .mem_rd_o      (mem_read_w),
         .mem_to_reg_o  (mem_to_reg_w),
@@ -231,10 +247,10 @@ register #(.N(72)) mem_wb_reg (
     reg_file #(.N(32)) reg_file_inst (
         .clk        (clk),
         .rst        (rst),
-        .rd_addr1_i (inst_w[`IR_rs1]),
-        .rd_addr2_i (inst_w[`IR_rs2]),
-        .wr_addr_i  (inst_w[`IR_rd]),
-        .wr_en_i    (reg_write_w),
+        .rd_addr1_i (if_id_inst_w[`IR_rs1]),
+        .rd_addr2_i (if_id_inst_w[`IR_rs2]),
+        .wr_addr_i  (mem_wb_rd_w),
+        .wr_en_i    (mem_wb_ctrl_w[0]),
         .wr_data_i  (writeback_data_w),
         .rd_data1_o (reg_read1_w),
         .rd_data2_o (reg_read2_w)
@@ -242,29 +258,29 @@ register #(.N(72)) mem_wb_reg (
 
     // --- Immediate Generator ---
     imm_gen imm_gen_inst (
-        .inst_i (inst_w),
+        .inst_i (if_id_inst_w),
         .gen_o  (imm_w)
     );
 
     // --- ALU Input Muxes ---
     nmux #(.N(32)) alu_a_mux (
-        .a_i (reg_read1_w),
-        .b_i (pc_out_w),
-        .s_i (a_sel_w),
+        .a_i (id_ex_reg1_w),
+        .b_i (id_ex_pc_w),
+        .s_i (id_ex_ctrl_w[2]),
         .c_o (alu_in_a_w)
     );
     nmux #(.N(32)) alu_b_mux (
-        .a_i (reg_read2_w),
-        .b_i (imm_w),
-        .s_i (b_sel_w),
+        .a_i (id_ex_reg2_w),
+        .b_i (id_ex_imm_w),
+        .s_i (id_ex_ctrl_w[3]),
         .c_o (alu_in_b_w)
     );
 
     // --- ALU Control ---
     alu_control alu_ctrl_inst (
-        .alu_op_i  (alu_op_w),
-        .funct3_i  (inst_w[`IR_funct3]),
-        .funct7_i  (inst_w[30]),
+        .alu_op_i  (id_ex_ctrl_w[1:0]),
+        .funct3_i  (id_ex_func_w[2:0]),
+        .funct7_i  (id_ex_func_w[3]),
         .alu_ctrl_o(alu_ctrl_w)
     );
 
@@ -272,7 +288,7 @@ register #(.N(72)) mem_wb_reg (
     alu alu_inst (
         .a_i        (alu_in_a_w),
         .b_i        (alu_in_b_w),
-        .shamt_i    (inst_w[`IR_shamt]),
+        .shamt_i    (alu_in_b_w[4:0]),
         .alu_ctrl_i (alu_ctrl_w),
         .c_o        (alu_out_w),
         .cf_o       (cf_w),
@@ -283,77 +299,77 @@ register #(.N(72)) mem_wb_reg (
 
     // --- Branch Address Adders ---
     rca #(.N(32)) offset_adder (
-        .a_i   (pc_out_w),
-        .b_i   (imm_w),
+        .a_i   (id_ex_pc_w),
+        .b_i   (id_ex_imm_w),
         .c_i   (1'b0),
         .c_o   (),
         .s_o   (pc_branch_w)
     );
-    rca #(.N(32)) following_pc_adder (
-        .a_i   (pc_out_w),
-        .b_i   (32'd4),
-        .c_i   (1'b0),
-        .c_o   (),
-        .s_o   (pc_plus_four_w)
-    );
-    assign pc_mux_sel_w = branch_w & take_branch_w;
+
 
     branch_control branch_control_inst(
-        .funct3_i(inst_w[`IR_funct3]),
+        .funct3_i(id_ex_func_w[2:0]),
         .zf_i(zf_w),
         .cf_i(cf_w),
         .vf_i(vf_w),
         .sf_i(sf_w),
         .take_branch_o(take_branch_w)
     );
-
+    // --- Load-Store Unit ---
+    
+    load_store_unit lsu_inst (
+        .funct3_i       (id_ex_func_w[2:0]),
+        .load_type_o      (load_type_w),
+        .store_type_o     (store_type_w)
+    );
+    
     // --- PC Target muxes ---
+    assign pc_mux_sel_w = (ex_mem_ctrl_w[3] & ex_mem_take_branch_w) | ex_mem_ctrl_w[0];
+    
+
+    
+    
     nmux #(.N(32)) pc_target_mux (
-        .a_i (pc_branch_w),
-        .b_i (alu_out_w),      // Jump target from ALU
-        .s_i (jump_w),
+        .a_i (ex_mem_branch_addr_w),
+        .b_i (ex_mem_alu_out_w),      // Jump target from ALU
+        .s_i (ex_mem_ctrl_w[0]),
         .c_o (pc_target_w)
     );
 
     nmux #(.N(32)) pc_mux (
         .a_i (pc_plus_four_w),
         .b_i (pc_target_w),
-        .s_i (pc_mux_sel_w | jump_w),
+        .s_i (pc_mux_sel_w),
         .c_o (pc_in_w)
     );
 
-    // --- Load-Store Unit ---
-    load_store_unit lsu_inst (
-        .funct3_i       (inst_w[`IR_funct3]),
-        .load_type_o      (load_type_w),
-        .store_type_o     (store_type_w)
-    );
+
 
     // --- Data Memory ---
     data_mem data_mem_inst (
         .clk           (clk),
-        .rd_en_i       (mem_read_w),
-        .wr_en_i       (mem_write_w),
-        .addr_i        (mem_addr_w),
-        .wr_data_i     (mem_wr_data_w),
-        .store_type_i    (store_type_w),
-        .load_type_i     (load_type_w),
+        .rd_en_i       (ex_mem_ctrl_w[2]),
+        .wr_en_i       (ex_mem_ctrl_w[1]),
+        .addr_i        (ex_mem_alu_out_w[7:0]),
+        .wr_data_i     (ex_mem_reg2_w),
+        .store_type_i    (ex_mem_store_type_w),
+        .load_type_i     (ex_mem_load_type_w),
         .rd_data_o   (mem_read_data_w)
     );
 
     // --- Writeback mux: ALU output or memory data ---
     nmux #(.N(32)) mem_to_reg_mux (
-        .a_i (alu_out_w),
-        .b_i (mem_read_data_w),
-        .s_i (mem_to_reg_w),
+        .a_i (mem_wb_alu_out_w),
+        .b_i (mem_wb_mem_data_w),
+        .s_i (mem_wb_ctrl_w[2]),
         .c_o (write_data_w)
     );
 
     // --- PC to Reg mux for JAL/JALR ---
     nmux #(.N(32)) pc_to_reg_mux (
         .a_i (write_data_w),
-        .b_i (pc_plus_four_w),
-        .s_i (pc_to_reg_w),
+        .b_i (mem_wb_pc),
+        .s_i (mem_wb_ctrl_w[1]),
         .c_o (writeback_data_w)
     );
 
