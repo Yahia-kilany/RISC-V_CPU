@@ -102,6 +102,10 @@ register #(.N(159)) id_ex_reg (
                     ,branch_w, mem_read_w,mem_write_w,jump_w,
                     b_sel_w,a_sel_w,alu_op_w},   
                     
+                {pc_write_en_w, mem_to_reg_w, pc_to_reg_w, reg_write_w
+                    ,branch_w, mem_read_w,mem_write_w,jump_w,
+                    b_sel_w,a_sel_w,alu_op_w},   
+                    
                 if_id_pc_w,
                 reg_read1_w,
                 reg_read2_w,
@@ -178,6 +182,7 @@ register #(.N(147)) ex_mem_reg (
 wire [31:0] mem_wb_mem_data_w, mem_wb_alu_out_w,mem_wb_pc;
 wire [3:0]  mem_wb_ctrl_w;
 wire [4:0]  mem_wb_rd_w;
+
 
 
 // 105-bit pipeline register
