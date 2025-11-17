@@ -64,4 +64,24 @@ module data_mem (
         end
     end
 
+initial begin
+// 17
+mem[0] = 8'h11;
+mem[1] = 8'h00;
+mem[2] = 8'h00;
+mem[3] = 8'h00;
+
+// 9
+mem[4] = 8'h09;
+mem[5] = 8'h00;
+mem[6] = 8'h00;
+mem[7] = 8'h00;
+
+// 25
+mem[8]  = 8'h19;
+mem[9]  = 8'h00;
+mem[10] = 8'h00;
+mem[11] = 8'h00;
+end
+
 endmodule

@@ -26,8 +26,8 @@ module bcd (
     output reg [3:0] tens_o,
     output reg [3:0] ones_o
 );
+    integer i;
     always @* begin
-        integer i;
         //initialization
         thousands_o = 4'd0;
         hundreds_o = 4'd0;

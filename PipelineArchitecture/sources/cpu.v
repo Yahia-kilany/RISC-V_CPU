@@ -53,8 +53,6 @@ module cpu (
     wire        mem_read_w, mem_write_w, mem_to_reg_w;
 
     // LSU to Data Memory control signals
-    wire [7:0]  mem_addr_w;
-    wire [31:0] mem_wr_data_w;
     wire [2:0]  load_type_w;
     wire [1:0] store_type_w;
 
