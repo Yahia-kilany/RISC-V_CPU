@@ -102,10 +102,6 @@ register #(.N(159)) id_ex_reg (
                     ,branch_w, mem_read_w,mem_write_w,jump_w,
                     b_sel_w,a_sel_w,alu_op_w},   
                     
-                {pc_write_en_w, mem_to_reg_w, pc_to_reg_w, reg_write_w
-                    ,branch_w, mem_read_w,mem_write_w,jump_w,
-                    b_sel_w,a_sel_w,alu_op_w},   
-                    
                 if_id_pc_w,
                 reg_read1_w,
                 reg_read2_w,
