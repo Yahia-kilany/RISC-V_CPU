@@ -29,177 +29,120 @@ module cpu (
     output reg  [12:0] ssd_o
 );
 
+    // ---------------------
+    // INTERNAL WIRES
+    // ---------------------
 
-    
+    //PC wires 
+    wire [31:0] pc_in_w;        // next PC value (from mux)
+    wire [31:0] pc_out_w;       // current PC value
+    wire [31:0] pc_plus_four_w; // PC + 4 (normal sequential flow)
 
+    wire [31:0] inst_w;         // instruction fetched from instruction memory
 
-    // --- Internal Wires ---
-    wire [31:0] pc_in_w, pc_out_w;
-    wire [31:0] inst_w;
+    //register outputs
+    wire [31:0] reg_read1_w;    // rs1 read data
+    wire [31:0] reg_read2_w;    // rs2 read data
 
-    wire [31:0] reg_read1_w, reg_read2_w;
-    wire [31:0] alu_in_a_w, alu_in_b_w, alu_out_w;
-    wire [31:0] imm_w;
+    wire [31:0] imm_w;          // immediate extracted from instruction
 
-    wire [31:0] pc_plus_four_w, pc_branch_w, pc_target_w;
-    wire        pc_write_en_w, jump_w, pc_to_reg_w, branch_w, take_branch_w;
-    wire        pc_mux_sel_w;
+    // alu wires
+    wire [31:0] alu_in_a_w;     // ALU input A (rs1 or PC)
+    wire [31:0] alu_in_b_w;     // ALU input B (rs2 or immediate)
+    wire [31:0] alu_out_w;      // ALU computation output
 
-    wire        reg_write_w, a_sel_w, b_sel_w;
-    wire [1:0]  alu_op_w;
-    wire [3:0]  alu_ctrl_w;
-    wire        cf_w, zf_w, vf_w, sf_w;
+    wire [31:0] pc_branch_w;    // PC + immediate (branch target before selecting)
+    wire [31:0] pc_target_w;    // final selected PC target (branch/jump PC)
 
-    wire        mem_read_w, mem_write_w, mem_to_reg_w;
+    wire [31:0] mem_read_data_w;  // data read from memory (load)
+    wire [31:0] write_data_w;     // memory output(load) or  alu output 
+    wire [31:0] writeback_data_w; // data written back to register file
 
-    // LSU to Data Memory control signals
-    wire [2:0]  load_type_w;
-    wire [1:0] store_type_w;
+    wire [3:0]  alu_ctrl_w;     // ALU control signal (operation select)
+    wire [2:0]  load_type_w;    // load type (byte, halfword, word, signed/unsigned)
+    wire [1:0]  store_type_w;   // store type (byte, halfword, word)
+    wire        take_branch_w;  // branch decision
 
-    // Data memory output
-    wire [31:0] mem_read_data_w;
+    //Control unit outputs
+    wire [1:0]  alu_op_w;       // ALUOp from control unit
+    wire        pc_write_en_w;  // PC write enable
+    wire        jump_w;         // jump instruction detected
+    wire        pc_to_reg_w;    // write PC+4 to rd (e.g. JAL)
+    wire        branch_w;       // branch instruction detected
+    wire        pc_mux_sel_w;   // select next PC source
+    wire        reg_write_w;    // register file write enable
+    wire        mem_read_w;     // memory read enable
+    wire        mem_write_w;    // memory write enable
+    wire        mem_to_reg_w;   // select memory output for writeback
+    wire        a_sel_w;        // ALU A-input select (rs1 or PC)
+    wire        b_sel_w;        // ALU B-input select (rs2 or immediate)
 
-    // Writeback wires
-    wire [31:0] write_data_w, writeback_data_w;
+    //ALU flags
+    wire        cf_w;           // carry flag
+    wire        zf_w;           // zero flag
+    wire        vf_w;           // overflow flag
+    wire        sf_w;           // sign flag
 
-// ===============================
-// IF/ID PIPELINE REGISTER
-// ===============================
+    // ---------------------
+    // PIPELINE WIRES
+    // ---------------------
 
-// Wires
-wire [31:0] if_id_pc_w, if_id_inst_w;
+    // IF/ID register wires
+    wire [31:0] if_id_pc_w;      // PC forwarded from IF → ID stage
+    wire [31:0] if_id_inst_w;    // instruction forwarded from IF → ID stage
 
-// Pipeline register (64 bits)
-register #(.N(64)) if_id_reg (
-    .clk     (clk),
-    .rst     (rst),
-    .wr_en_i (1'b1),
-    .d_i     ({pc_out_w, inst_w}),
-    .d_o     ({if_id_pc_w, if_id_inst_w})
-);
+    // ID/EX register wires
+    wire [31:0] id_ex_pc_w;      // PC forwarded from ID → EX stage
+    wire [31:0] id_ex_reg1_w;    // RS1 register value entering EX
+    wire [31:0] id_ex_reg2_w;    // RS2 register value entering EX
+    wire [31:0] id_ex_imm_w;     // immediate value entering EX 
+    wire [3:0]  id_ex_func_w;    // ALU control / func3+func7 bits
+    wire [4:0]  id_ex_rs1_w;     // RS1 index forwarded to EX
+    wire [4:0]  id_ex_rs2_w;     // RS2 index forwarded to EX
+    wire [4:0]  id_ex_rd_w;      // destination register index forwarded to EX
+    wire [11:0] id_ex_ctrl_w;    // EX stage control signals:
+                                    // [11]pc_write_en [10]mem_to_reg [9]pc_to_reg [8]reg_write 
+                                    // [7]branch [6]mem_read [5]mem_write [4]jump [3]b_sel [2]a_sel [1:0]alu_op   
 
+    // EX/MEM register wires
+    wire [31:0] ex_mem_branch_addr_w; // calculated branch/jump target address
+    wire [31:0] ex_mem_alu_out_w;     // ALU result forwarded to MEM stage
+    wire [31:0] ex_mem_reg2_w;        // RS2 value for store instructions
+    wire [31:0] ex_mem_pc_w;          // PC forwarded to MEM (for JAL writeback)
+    wire [4:0]  ex_mem_rd_w;          // destination register forwarded to MEM
+    wire        ex_mem_take_branch_w; // branch decision resolved in EX stage
+    wire [2:0]  ex_mem_load_type_w;   // load type forwarded to MEM
+    wire [1:0]  ex_mem_store_type_w;  // store type forwarded to MEM
+    wire [7:0]  ex_mem_ctrl_w;        // packed control bits for MEM stage
+                                        // [7]pc_write_en [6]mem_to_reg [5]pc_to_reg [4]reg_write 
+                                        // [3]branch [2]mem_read [1]mem_write [0]jump  
 
+    // MEM/WB register wires
+    wire [31:0] mem_wb_mem_data_w;    // data loaded from memory (MEM → WB)
+    wire [31:0] mem_wb_alu_out_w;     // ALU result forwarded from MEM → WB
+    wire [31:0] mem_wb_pc;            // PC+4 for JAL/JALR writeback
+    wire [4:0]  mem_wb_rd_w;          // destination register index at WB
+    wire [3:0]  mem_wb_ctrl_w;        // packed WB-stage control signals
+                                        // [3]pc_write_en [2]mem_to_reg [1]pc_to_reg [0]reg_write 
 
-// ===============================
-// ID/EX PIPELINE REGISTER
-// ===============================
+    // =================================================
+    // PROGRAM COUNTER & INSTRUCTION FETCH
+    // =================================================
 
-// Wires
-wire [31:0] id_ex_pc_w, id_ex_reg1_w, id_ex_reg2_w, id_ex_imm_w;
-wire [11:0]  id_ex_ctrl_w;
-wire [3:0]  id_ex_func_w;
-wire [4:0]  id_ex_rs1_w, id_ex_rs2_w, id_ex_rd_w;
+    register #(.N(32)) pc (
+        .clk      (clk),
+        .rst      (rst),
+        .wr_en_i  (mem_wb_ctrl_w[3]),
+        .d_i      (pc_in_w),
+        .d_o      (pc_out_w)
+    );
 
-// 159-bit pipeline register
-register #(.N(159)) id_ex_reg (
-    .clk     (clk),
-    .rst     (rst),
-    .wr_en_i (1'b1),
-    .d_i     ({
-                {pc_write_en_w, mem_to_reg_w, pc_to_reg_w, reg_write_w
-                    ,branch_w, mem_read_w,mem_write_w,jump_w,
-                    b_sel_w,a_sel_w,alu_op_w},   
-                    
-                if_id_pc_w,
-                reg_read1_w,
-                reg_read2_w,
-                imm_w,
+    inst_mem inst_mem_inst (
+        .addr_i (pc_out_w[9:2]),
+        .data_o (inst_w)
+    );
 
-                {if_id_inst_w[30], if_id_inst_w[14:12]}, // funct7-bit & funct3
-                if_id_inst_w[19:15],  // rs1
-                if_id_inst_w[24:20],  // rs2
-                if_id_inst_w[11:7]    // rd
-             }),
-    .d_o     ({
-                id_ex_ctrl_w,
-                id_ex_pc_w,
-                id_ex_reg1_w,
-                id_ex_reg2_w,
-                id_ex_imm_w,
-                id_ex_func_w,
-                id_ex_rs1_w,
-                id_ex_rs2_w,
-                id_ex_rd_w
-             })
-);
-
-
-
-// ===============================
-// EX/MEM PIPELINE REGISTER
-// ===============================
-
-// Wires
-wire [31:0] ex_mem_branch_addr_w, ex_mem_alu_out_w, ex_mem_reg2_w,ex_mem_pc_w;
-wire [7:0]  ex_mem_ctrl_w;
-wire [4:0] ex_mem_rd_w;
-wire        ex_mem_take_branch_w;
-wire [2:0]  ex_mem_load_type_w;
-wire [1:0]  ex_mem_store_type_w;
-                
-// 147-bit pipeline register
-register #(.N(147)) ex_mem_reg (
-    .clk     (clk),
-    .rst     (rst),
-    .wr_en_i (1'b1),
-    .d_i     ({
-                id_ex_ctrl_w[11:4],  // ctrl subset
-                pc_branch_w,
-                take_branch_w,
-                alu_out_w,
-                id_ex_reg2_w,
-                id_ex_rd_w,
-                load_type_w,
-                store_type_w,
-                id_ex_pc_w
-             }),
-    .d_o     ({
-                ex_mem_ctrl_w,
-                ex_mem_branch_addr_w,
-                ex_mem_take_branch_w,
-                ex_mem_alu_out_w,
-                ex_mem_reg2_w,
-                ex_mem_rd_w,
-                ex_mem_load_type_w,
-                ex_mem_store_type_w,
-                ex_mem_pc_w
-             })
-);
-
-
-
-// ===============================
-// MEM/WB PIPELINE REGISTER
-// ===============================
-
-// Wires
-wire [31:0] mem_wb_mem_data_w, mem_wb_alu_out_w,mem_wb_pc;
-wire [3:0]  mem_wb_ctrl_w;
-wire [4:0]  mem_wb_rd_w;
-
-
-
-// 105-bit pipeline register
-register #(.N(105)) mem_wb_reg (
-    .clk     (clk),
-    .rst     (rst),
-    .wr_en_i (1'b1),
-    .d_i     ({
-                ex_mem_ctrl_w[7:4],
-                mem_read_data_w,
-                ex_mem_alu_out_w,
-                ex_mem_rd_w,
-                pc_plus_four_w
-             }),
-    .d_o     ({
-                mem_wb_ctrl_w,
-                mem_wb_mem_data_w,
-                mem_wb_alu_out_w,
-                mem_wb_rd_w,
-                mem_wb_pc
-             })
-);
-     rca #(.N(32)) following_pc_adder (
+    rca #(.N(32)) following_pc_adder (
         .a_i   (pc_out_w),
         .b_i   (32'd4),
         .c_i   (1'b0),
@@ -208,25 +151,22 @@ register #(.N(105)) mem_wb_reg (
     );
 
 
-
-
-    
-    // --- Program Counter ---
-    register #(.N(32)) pc (
-        .clk      (clk),
-        .rst      (rst),
-        .wr_en_i  (1'b1),
-        .d_i      (pc_in_w),
-        .d_o      (pc_out_w)
+    // =================================================
+    // IF/ID PIPELINE REGISTER
+    // =================================================
+    register #(.N(64)) if_id_reg (
+        .clk     (clk),
+        .rst     (rst),
+        .wr_en_i (1'b1),
+        .d_i     ({pc_out_w, inst_w}),
+        .d_o     ({if_id_pc_w, if_id_inst_w})
     );
 
-    // --- Instruction Memory ---
-    inst_mem inst_mem_inst (
-        .addr_i (pc_out_w[9:2]),
-        .data_o (inst_w)
-    );
 
-    // --- Control Unit ---
+    // =================================================
+    // DECODE STAGE
+    // =================================================
+
     control_unit ctrl_unit (
         .opcode_i      (if_id_inst_w[`IR_opcode]),
         .branch_o      (branch_w),
@@ -242,7 +182,6 @@ register #(.N(105)) mem_wb_reg (
         .pc_wr_en_o    (pc_write_en_w)
     );
 
-    // --- Register File ---
     reg_file #(.N(32)) reg_file_inst (
         .clk        (clk),
         .rst        (rst),
@@ -255,19 +194,60 @@ register #(.N(105)) mem_wb_reg (
         .rd_data2_o (reg_read2_w)
     );
 
-    // --- Immediate Generator ---
     imm_gen imm_gen_inst (
         .inst_i (if_id_inst_w),
         .gen_o  (imm_w)
     );
 
-    // --- ALU Input Muxes ---
+
+    // =================================================
+    // ID/EX PIPELINE REGISTER
+    // =================================================
+
+
+
+    register #(.N(159)) id_ex_reg (
+        .clk     (clk),
+        .rst     (rst),
+        .wr_en_i (1'b1),
+        .d_i     ({
+                    {pc_write_en_w, mem_to_reg_w, pc_to_reg_w, reg_write_w,
+                     branch_w, mem_read_w, mem_write_w, jump_w,
+                     b_sel_w, a_sel_w, alu_op_w},
+                    if_id_pc_w,
+                    reg_read1_w,
+                    reg_read2_w,
+                    imm_w,
+                    {if_id_inst_w[30], if_id_inst_w[14:12]},
+                    if_id_inst_w[19:15],
+                    if_id_inst_w[24:20],
+                    if_id_inst_w[11:7]
+                 }),
+        .d_o     ({
+                    id_ex_ctrl_w,
+                    id_ex_pc_w,
+                    id_ex_reg1_w,
+                    id_ex_reg2_w,
+                    id_ex_imm_w,
+                    id_ex_func_w,
+                    id_ex_rs1_w,
+                    id_ex_rs2_w,
+                    id_ex_rd_w
+                 })
+    );
+
+
+    // =================================================
+    // EXECUTE STAGE
+    // =================================================
+
     nmux #(.N(32)) alu_a_mux (
         .a_i (id_ex_reg1_w),
         .b_i (id_ex_pc_w),
         .s_i (id_ex_ctrl_w[2]),
         .c_o (alu_in_a_w)
     );
+
     nmux #(.N(32)) alu_b_mux (
         .a_i (id_ex_reg2_w),
         .b_i (id_ex_imm_w),
@@ -275,7 +255,6 @@ register #(.N(105)) mem_wb_reg (
         .c_o (alu_in_b_w)
     );
 
-    // --- ALU Control ---
     alu_control alu_ctrl_inst (
         .alu_op_i  (id_ex_ctrl_w[1:0]),
         .funct3_i  (id_ex_func_w[2:0]),
@@ -283,7 +262,6 @@ register #(.N(105)) mem_wb_reg (
         .alu_ctrl_o(alu_ctrl_w)
     );
 
-    // --- ALU ---
     alu alu_inst (
         .a_i        (alu_in_a_w),
         .b_i        (alu_in_b_w),
@@ -296,7 +274,6 @@ register #(.N(105)) mem_wb_reg (
         .sf_o       (sf_w)
     );
 
-    // --- Branch Address Adders ---
     rca #(.N(32)) offset_adder (
         .a_i   (id_ex_pc_w),
         .b_i   (id_ex_imm_w),
@@ -304,7 +281,6 @@ register #(.N(105)) mem_wb_reg (
         .c_o   (),
         .s_o   (pc_branch_w)
     );
-
 
     branch_control branch_control_inst(
         .funct3_i(id_ex_func_w[2:0]),
@@ -314,23 +290,67 @@ register #(.N(105)) mem_wb_reg (
         .sf_i(sf_w),
         .take_branch_o(take_branch_w)
     );
-    // --- Load-Store Unit ---
-    
+
     load_store_unit lsu_inst (
         .funct3_i       (id_ex_func_w[2:0]),
-        .load_type_o      (load_type_w),
-        .store_type_o     (store_type_w)
+        .load_type_o    (load_type_w),
+        .store_type_o   (store_type_w)
     );
-    
-    // --- PC Target muxes ---
-    assign pc_mux_sel_w = (ex_mem_ctrl_w[3] & ex_mem_take_branch_w) | ex_mem_ctrl_w[0];
-    
 
-    
-    
+
+    // =================================================
+    // EX/MEM PIPELINE REGISTER
+    // =================================================
+
+    register #(.N(147)) ex_mem_reg (
+        .clk     (clk),
+        .rst     (rst),
+        .wr_en_i (1'b1),
+        .d_i     ({
+                    id_ex_ctrl_w[11:4],
+                    pc_branch_w,
+                    take_branch_w,
+                    alu_out_w,
+                    id_ex_reg2_w,
+                    id_ex_rd_w,
+                    load_type_w,
+                    store_type_w,
+                    id_ex_pc_w
+                 }),
+        .d_o     ({
+                    ex_mem_ctrl_w,
+                    ex_mem_branch_addr_w,
+                    ex_mem_take_branch_w,
+                    ex_mem_alu_out_w,
+                    ex_mem_reg2_w,
+                    ex_mem_rd_w,
+                    ex_mem_load_type_w,
+                    ex_mem_store_type_w,
+                    ex_mem_pc_w
+                 })
+    );
+
+
+    // =================================================
+    // MEMORY STAGE
+    // =================================================
+
+    data_mem data_mem_inst (
+        .clk           (clk),
+        .rd_en_i       (ex_mem_ctrl_w[2]),
+        .wr_en_i       (ex_mem_ctrl_w[1]),
+        .addr_i        (ex_mem_alu_out_w[7:0]),
+        .wr_data_i     (ex_mem_reg2_w),
+        .store_type_i  (ex_mem_store_type_w),
+        .load_type_i   (ex_mem_load_type_w),
+        .rd_data_o     (mem_read_data_w)
+    );
+
+    assign pc_mux_sel_w = (ex_mem_ctrl_w[3] & ex_mem_take_branch_w) | ex_mem_ctrl_w[0];
+
     nmux #(.N(32)) pc_target_mux (
         .a_i (ex_mem_branch_addr_w),
-        .b_i (ex_mem_alu_out_w),      // Jump target from ALU
+        .b_i (ex_mem_alu_out_w),
         .s_i (ex_mem_ctrl_w[0]),
         .c_o (pc_target_w)
     );
@@ -343,20 +363,36 @@ register #(.N(105)) mem_wb_reg (
     );
 
 
+    // =================================================
+    // MEM/WB PIPELINE REGISTER
+    // =================================================
 
-    // --- Data Memory ---
-    data_mem data_mem_inst (
-        .clk           (clk),
-        .rd_en_i       (ex_mem_ctrl_w[2]),
-        .wr_en_i       (ex_mem_ctrl_w[1]),
-        .addr_i        (ex_mem_alu_out_w[7:0]),
-        .wr_data_i     (ex_mem_reg2_w),
-        .store_type_i    (ex_mem_store_type_w),
-        .load_type_i     (ex_mem_load_type_w),
-        .rd_data_o   (mem_read_data_w)
+
+    register #(.N(105)) mem_wb_reg (
+        .clk     (clk),
+        .rst     (rst),
+        .wr_en_i (1'b1),
+        .d_i     ({
+                    ex_mem_ctrl_w[7:4],
+                    mem_read_data_w,
+                    ex_mem_alu_out_w,
+                    ex_mem_rd_w,
+                    pc_plus_four_w
+                 }),
+        .d_o     ({
+                    mem_wb_ctrl_w,
+                    mem_wb_mem_data_w,
+                    mem_wb_alu_out_w,
+                    mem_wb_rd_w,
+                    mem_wb_pc
+                 })
     );
 
-    // --- Writeback mux: ALU output or memory data ---
+
+    // =================================================
+    // WRITEBACK STAGE
+    // =================================================
+
     nmux #(.N(32)) mem_to_reg_mux (
         .a_i (mem_wb_alu_out_w),
         .b_i (mem_wb_mem_data_w),
@@ -364,7 +400,6 @@ register #(.N(105)) mem_wb_reg (
         .c_o (write_data_w)
     );
 
-    // --- PC to Reg mux for JAL/JALR ---
     nmux #(.N(32)) pc_to_reg_mux (
         .a_i (write_data_w),
         .b_i (mem_wb_pc),
@@ -372,7 +407,11 @@ register #(.N(105)) mem_wb_reg (
         .c_o (writeback_data_w)
     );
 
-    // --- LED & 7-Segment Displays ---
+
+    // =================================================
+    // LED / 7-SEG OUTPUTS
+    // =================================================
+
     always @(*) begin
         case (led_sel_i)
             2'b00: inst_led_o = inst_w[15:0];
