@@ -102,7 +102,7 @@ module control_unit (
                 a_sel_o       = 1'b0;
                 b_sel_o       = 1'b0;
                 reg_wr_o      = 1'b0;
-//                pc_wr_en_o = 1'b0;
+                pc_wr_en_o    = 1'b0;
                 
             end
             
@@ -113,6 +113,15 @@ module control_unit (
                 b_sel_o      = 1'b1;   // Immediate
                 alu_op_o     = 2'b00;  // ADD for target address (PC + imm)
                 a_sel_o      = 1'b1;   // PC
+            end
+
+            `OPCODE_JALR: begin
+                jump_o       = 1'b1;
+                reg_wr_o     = 1'b1;
+                pc_to_reg_o  = 1'b1;   
+                b_sel_o      = 1'b1;   // Immediate
+                alu_op_o     = 2'b00;  // ADD for target address (rs1 + imm)
+                a_sel_o      = 1'b0;   // rs1
             end
             
             

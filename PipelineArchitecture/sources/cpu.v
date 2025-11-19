@@ -120,7 +120,7 @@ module cpu (
     // MEM/WB register wires
     wire [31:0] mem_wb_mem_data_w;    // data loaded from memory (MEM → WB)
     wire [31:0] mem_wb_alu_out_w;     // ALU result forwarded from MEM → WB
-    wire [31:0] mem_wb_pc;            // PC+4 for JAL/JALR writeback
+    wire [31:0] mem_wb_pc_w;            // PC+4 for JAL/JALR writeback
     wire [4:0]  mem_wb_rd_w;          // destination register index at WB
     wire [3:0]  mem_wb_ctrl_w;        // packed WB-stage control signals
                                         // [3]pc_write_en [2]mem_to_reg [1]pc_to_reg [0]reg_write 
@@ -132,15 +132,11 @@ module cpu (
     register #(.N(32)) pc (
         .clk      (clk),
         .rst      (rst),
-        .wr_en_i  (mem_wb_ctrl_w[3]),
+        .wr_en_i  (pc_write_en_w),
         .d_i      (pc_in_w),
         .d_o      (pc_out_w)
     );
 
-    inst_mem inst_mem_inst (
-        .addr_i (pc_out_w[9:2]),
-        .data_o (inst_w)
-    );
 
     rca #(.N(32)) following_pc_adder (
         .a_i   (pc_out_w),
@@ -155,10 +151,10 @@ module cpu (
     // IF/ID PIPELINE REGISTER
     // =================================================
     register #(.N(64)) if_id_reg (
-        .clk     (clk),
+        .clk     (~clk),
         .rst     (rst),
         .wr_en_i (1'b1),
-        .d_i     ({pc_out_w, inst_w}),
+        .d_i     ({pc_out_w, mem_read_data_w}),
         .d_o     ({if_id_pc_w, if_id_inst_w})
     );
 
@@ -303,7 +299,7 @@ module cpu (
     // =================================================
 
     register #(.N(147)) ex_mem_reg (
-        .clk     (clk),
+        .clk     (~clk),
         .rst     (rst),
         .wr_en_i (1'b1),
         .d_i     ({
@@ -334,15 +330,40 @@ module cpu (
     // =================================================
     // MEMORY STAGE
     // =================================================
+    wire [31:0] unified_addr_w;
+    wire        unified_rd_en_w;
+    wire [2:0]  unified_load_type_w;
 
-    data_mem data_mem_inst (
-        .clk           (clk),
-        .rd_en_i       (ex_mem_ctrl_w[2]),
+    nmux #(.N(32)) mem_addr_mux (
+        .a_i(ex_mem_alu_out_w),             // PC for instruction fetch
+        .b_i(pc_out_w),     // ALU result for load/store
+        .s_i(clk),
+        .c_o(unified_addr_w)
+    );
+
+    nmux #(.N(1)) mem_rd_mux (
+    .a_i(ex_mem_ctrl_w[2]),                  // always read for instruction fetch
+     .b_i(1'b1),      // actual load read enable
+    .s_i(clk),
+    .c_o(unified_rd_en_w)
+    );
+
+    nmux #(.N(3)) load_type_mux (
+    .a_i(ex_mem_load_type_w),                 // WORD for instruction fetch
+    .b_i(3'b100),     // LSU-decoderd load type
+    .s_i(clk),
+    .c_o(unified_load_type_w)
+);
+
+
+    data_mem unified_mem_inst (
+        .clk           (~clk),
+        .rd_en_i       (unified_rd_en_w),
         .wr_en_i       (ex_mem_ctrl_w[1]),
-        .addr_i        (ex_mem_alu_out_w[7:0]),
+        .addr_i        (unified_addr_w[7:0]),
         .wr_data_i     (ex_mem_reg2_w),
         .store_type_i  (ex_mem_store_type_w),
-        .load_type_i   (ex_mem_load_type_w),
+        .load_type_i   (unified_load_type_w),
         .rd_data_o     (mem_read_data_w)
     );
 
@@ -377,14 +398,14 @@ module cpu (
                     mem_read_data_w,
                     ex_mem_alu_out_w,
                     ex_mem_rd_w,
-                    pc_plus_four_w
+                    ex_mem_pc_w+4
                  }),
         .d_o     ({
                     mem_wb_ctrl_w,
                     mem_wb_mem_data_w,
                     mem_wb_alu_out_w,
                     mem_wb_rd_w,
-                    mem_wb_pc
+                    mem_wb_pc_w
                  })
     );
 
@@ -402,7 +423,7 @@ module cpu (
 
     nmux #(.N(32)) pc_to_reg_mux (
         .a_i (write_data_w),
-        .b_i (mem_wb_pc),
+        .b_i (mem_wb_pc_w),
         .s_i (mem_wb_ctrl_w[1]),
         .c_o (writeback_data_w)
     );
