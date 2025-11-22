@@ -38,7 +38,7 @@ module cpu (
     wire [31:0] pc_out_w;       // current PC value
     wire [31:0] pc_plus_four_w; // PC + 4 (normal sequential flow)
 
-    wire [31:0] inst_w;         // instruction fetched from instruction memory
+
 
     //register outputs
     wire [31:0] reg_read1_w;    // rs1 read data
@@ -236,20 +236,38 @@ module cpu (
     // =================================================
     // EXECUTE STAGE
     // =================================================
-
-    nmux #(.N(32)) alu_a_mux (
-        .a_i (id_ex_reg1_w),
+    wire [31:0] forwarding_register1_w, forwarding_register2_w;
+    wire forwarda_w, forwardb_w;
+    nmux #(.N(32)) alu_a_1_mux (
+        .a_i (forwarding_register1_w),
         .b_i (id_ex_pc_w),
         .s_i (id_ex_ctrl_w[2]),
         .c_o (alu_in_a_w)
     );
 
-    nmux #(.N(32)) alu_b_mux (
-        .a_i (id_ex_reg2_w),
+    nmux #(.N(32)) alu_b_1_mux (
+        .a_i (forwarding_register2_w),
         .b_i (id_ex_imm_w),
         .s_i (id_ex_ctrl_w[3]),
         .c_o (alu_in_b_w)
     );
+
+    
+    
+    nmux #(.N(32)) alu_a_2_mux (
+        .a_i (id_ex_reg1_w),
+        .b_i (write_data_w),
+        .s_i (forwarda_w),
+        .c_o (forwarding_register1_w)
+    );
+    
+    nmux #(.N(32)) alu_b_2_mux (
+        .a_i (id_ex_reg2_w),
+        .b_i (write_data_w),
+        .s_i (forwardb_w),
+        .c_o (forwarding_register2_w)
+    );
+    
 
     alu_control alu_ctrl_inst (
         .alu_op_i  (id_ex_ctrl_w[1:0]),
@@ -366,9 +384,20 @@ module cpu (
         .load_type_i   (unified_load_type_w),
         .rd_data_o     (mem_read_data_w)
     );
+    
+    
+    
 
+    forwarding_unit forwading_1(
+        forwarda_w, forwardb_w,
+        id_ex_rs1_w, id_ex_rs2_w,
+        mem_wb_rd_w,
+        mem_wb_ctrl_w[0]
+    );
+    
     assign pc_mux_sel_w = (ex_mem_ctrl_w[3] & ex_mem_take_branch_w) | ex_mem_ctrl_w[0];
 
+        
     nmux #(.N(32)) pc_target_mux (
         .a_i (ex_mem_branch_addr_w),
         .b_i (ex_mem_alu_out_w),
@@ -435,8 +464,8 @@ module cpu (
 
     always @(*) begin
         case (led_sel_i)
-            2'b00: inst_led_o = inst_w[15:0];
-            2'b01: inst_led_o = inst_w[31:16];
+            2'b00: inst_led_o = mem_read_data_w[15:0];
+            2'b01: inst_led_o = mem_read_data_w[31:16];
             2'b10: inst_led_o = {cf_w, vf_w, sf_w, zf_w,
                                  branch_w, mem_read_w, mem_to_reg_w,
                                  mem_write_w, reg_write_w,
