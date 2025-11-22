@@ -6,6 +6,15 @@
 `define     IR_funct7       31:25
 `define     IR_shamt        24:20
 
+`define     C_rsdP          4:2
+`define     C_rs2P          4:2
+`define     C_rs1P          9:7
+`define     C_rs2           6:2  
+`define     C_rsd           11:7
+`define     C_rs1           11:7
+`define     C_funct4        15:12
+`define     C_funct3        15:13
+
 `define     OPCODE_Branch   5'b11_000
 `define     OPCODE_Load     5'b00_000
 `define     OPCODE_Store    5'b01_000
@@ -26,6 +35,18 @@
 `define     F3_SRL          3'b101
 `define     F3_OR           3'b110
 `define     F3_AND          3'b111
+
+
+`define     F3_LB           3'b000
+`define     F3_LH           3'b001
+`define     F3_LW           3'b010
+`define     F3_LBU          3'b100
+`define     F3_LHU          3'b101
+
+`define     F3_SB           2'b00
+`define     F3_SH           2'b01
+`define     F3_SW           2'b10
+
 
 `define     BR_BEQ          3'b000
 `define     BR_BNE          3'b001
@@ -48,5 +69,14 @@
 `define     ALU_SLT         4'b11_01
 `define     ALU_SLTU        4'b11_11
 
+`define     LOAD_B          3'b000
+`define     LOAD_H          3'b010
+`define     LOAD_W          3'b100
+`define     LOAD_BU         3'b001
+`define     LOAD_HU         3'b011
+
+`define     STORE_B         2'b00
+`define     STORE_H         2'b01
+`define     STORE_W         2'b10
 `define     SYS_EC_EB       3'b000
 
