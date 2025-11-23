@@ -20,3 +20,11 @@ RISC-V CPU Implementation Journal
 6. Testing
 - Generated comprehensive assembly test programs for all instruction types
 
+11/21/25
+7. Forwarding Unit
+- Implemented and tested the forwarding unit 
+11/23/25
+8. Branch Hazard Detection
+- Implemented the flushing mechanism
+- updated the block diagram
+- Wrote Parts of the of the report

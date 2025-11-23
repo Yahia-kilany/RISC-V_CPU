@@ -150,6 +150,10 @@ module cpu (
     // =================================================
     // IF/ID PIPELINE REGISTER
     // =================================================
+    wire [31:0] inst_or_flush_w;
+    nmux #(32) flushifid (pc_mux_sel_w,mem_read_data_w,32'b00000000000000000000000000110011,  inst_or_flush_w);
+
+    
     register #(.N(64)) if_id_reg (
         .clk     (~clk),
         .rst     (rst),
@@ -162,7 +166,8 @@ module cpu (
     // =================================================
     // DECODE STAGE
     // =================================================
-
+    
+    
     control_unit ctrl_unit (
         .opcode_i      (if_id_inst_w[`IR_opcode]),
         .branch_o      (branch_w),
@@ -199,17 +204,19 @@ module cpu (
     // =================================================
     // ID/EX PIPELINE REGISTER
     // =================================================
+    wire [11:0] decode_or_flush_w;
 
-
-
+    nmux #(.N(12)) flushidex(.a_i({pc_write_en_w, mem_to_reg_w, pc_to_reg_w, reg_write_w,
+                     branch_w, mem_read_w, mem_write_w, jump_w,
+                     b_sel_w, a_sel_w, alu_op_w}),
+                        .b_i(12'd000), .s_i(pc_mux_sel_w), .c_o(decode_or_flush_w));
+    
     register #(.N(159)) id_ex_reg (
         .clk     (clk),
         .rst     (rst),
         .wr_en_i (1'b1),
         .d_i     ({
-                    {pc_write_en_w, mem_to_reg_w, pc_to_reg_w, reg_write_w,
-                     branch_w, mem_read_w, mem_write_w, jump_w,
-                     b_sel_w, a_sel_w, alu_op_w},
+                    decode_or_flush_w,
                     if_id_pc_w,
                     reg_read1_w,
                     reg_read2_w,
@@ -232,27 +239,13 @@ module cpu (
                  })
     );
 
-
+    
     // =================================================
     // EXECUTE STAGE
     // =================================================
     wire [31:0] forwarding_register1_w, forwarding_register2_w;
     wire forwarda_w, forwardb_w;
-    nmux #(.N(32)) alu_a_1_mux (
-        .a_i (forwarding_register1_w),
-        .b_i (id_ex_pc_w),
-        .s_i (id_ex_ctrl_w[2]),
-        .c_o (alu_in_a_w)
-    );
-
-    nmux #(.N(32)) alu_b_1_mux (
-        .a_i (forwarding_register2_w),
-        .b_i (id_ex_imm_w),
-        .s_i (id_ex_ctrl_w[3]),
-        .c_o (alu_in_b_w)
-    );
-
-    
+    //ALU A
     
     nmux #(.N(32)) alu_a_2_mux (
         .a_i (id_ex_reg1_w),
@@ -261,12 +254,35 @@ module cpu (
         .c_o (forwarding_register1_w)
     );
     
+    nmux #(.N(32)) alu_a_1_mux (
+        .a_i (forwarding_register1_w),
+        .b_i (id_ex_pc_w),
+        .s_i (id_ex_ctrl_w[2]),
+        .c_o (alu_in_a_w)
+    );
+    
+    //ALU B 
     nmux #(.N(32)) alu_b_2_mux (
         .a_i (id_ex_reg2_w),
         .b_i (write_data_w),
         .s_i (forwardb_w),
         .c_o (forwarding_register2_w)
     );
+    
+    nmux #(.N(32)) alu_b_1_mux (
+        .a_i (forwarding_register2_w),
+        .b_i (id_ex_imm_w),
+        .s_i (id_ex_ctrl_w[3]),
+        .c_o (alu_in_b_w)
+    );
+    
+    
+    
+    
+    
+
+    
+    
     
 
     alu_control alu_ctrl_inst (
@@ -315,7 +331,11 @@ module cpu (
     // =================================================
     // EX/MEM PIPELINE REGISTER
     // =================================================
+    wire [7:0] execute_or_flush_w;
 
+    nmux #(.n(8)) flushexmem(.a_i(id_ex_ctrl_w[11:4]),
+                        .b_i(8'h00), .s_i(pc_mux_sel_w), .c_o(execute_or_flush_w));
+                        
     register #(.N(147)) ex_mem_reg (
         .clk     (~clk),
         .rst     (rst),
