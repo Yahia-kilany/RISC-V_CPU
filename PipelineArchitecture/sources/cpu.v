@@ -184,7 +184,7 @@ module cpu (
     );
 
     reg_file #(.N(32)) reg_file_inst (
-        .clk        (clk),
+        .clk        (~clk),
         .rst        (rst),
         .rd_addr1_i (if_id_inst_w[`IR_rs1]),
         .rd_addr2_i (if_id_inst_w[`IR_rs2]),
