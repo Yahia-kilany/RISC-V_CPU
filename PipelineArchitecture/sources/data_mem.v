@@ -33,11 +33,11 @@ module data_mem (
     always @(*) begin
         if (rd_en_i) begin
             case (load_type_i)
-                3'b000: rd_data_o = {{24{mem[addr_i][7]}}, mem[addr_i]};           // LB
-                3'b001: rd_data_o = {24'b0, mem[addr_i]};                          // LBU
-                3'b010: rd_data_o = {{16{mem[addr_i+1][7]}}, mem[addr_i+1], mem[addr_i]}; // LH
-                3'b011: rd_data_o = {16'b0, mem[addr_i+1], mem[addr_i]};           // LHU
-                3'b100: rd_data_o = {mem[addr_i+3], mem[addr_i+2], mem[addr_i+1], mem[addr_i]};           // LW
+                `LOAD_B: rd_data_o = {{24{mem[addr_i][7]}}, mem[addr_i]};           // LB
+                `LOAD_BU: rd_data_o = {24'b0, mem[addr_i]};                          // LBU
+                `LOAD_H: rd_data_o = {{16{mem[addr_i+1][7]}}, mem[addr_i+1], mem[addr_i]}; // LH
+                `LOAD_HU: rd_data_o = {16'b0, mem[addr_i+1], mem[addr_i]};           // LHU
+                `LOAD_W: rd_data_o = {mem[addr_i+3], mem[addr_i+2], mem[addr_i+1], mem[addr_i]};           // LW
                 default: rd_data_o = {mem[addr_i+3], mem[addr_i+2], mem[addr_i+1], mem[addr_i]}; // default LW
             endcase
         end else begin
@@ -49,12 +49,12 @@ module data_mem (
     always @(posedge clk) begin
         if (wr_en_i) begin
             case (store_type_i)
-                2'b00: mem[addr_i] <= wr_data_i[7:0];                // SB
-                2'b01: begin                                        // SH
+                `STORE_B: mem[addr_i] <= wr_data_i[7:0];                // SB
+                `STORE_H: begin                                        // SH
                     mem[addr_i]   <= wr_data_i[7:0];
                     mem[addr_i+1] <= wr_data_i[15:8];
                 end
-                2'b10: begin                                        // SW
+                `STORE_W: begin                                        // SW
                     mem[addr_i]   <= wr_data_i[7:0];
                     mem[addr_i+1] <= wr_data_i[15:8];
                     mem[addr_i+2] <= wr_data_i[23:16];
@@ -67,7 +67,7 @@ module data_mem (
 
 initial begin
         // Load memory
-        $readmemh("C:/Users/OMEN/Desktop/Mememe/college/semester 8/computer architecture/project 1/RISC-V_CPU/PipelineArchitecture/testcases/branchflush.hex", mem);
+        $readmemh("C:/Users/Yahia/Desktop/RISC-V_CPU/PipelineArchitecture/testcases/lab.mem", mem);
         mem[252] = 8'h34;
         mem[253] = 8'h00;
         mem[254] = 8'h00;

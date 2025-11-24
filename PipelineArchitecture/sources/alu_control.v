@@ -48,7 +48,7 @@ module alu_control (
                 endcase
             end
             2'b11: alu_ctrl_o = `ALU_PASS; // LUI
-            default: alu_ctrl_o = 4'b0000; // NOP/invalid case
+            default: alu_ctrl_o = 4'b0000; // Default/invalid OP: ADD
         endcase
     end
 
