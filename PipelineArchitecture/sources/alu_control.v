@@ -27,6 +27,7 @@ module alu_control (
     input  wire [1:0] alu_op_i,     // ALUOp from main control unit
     input  wire [2:0] funct3_i,     // Instruction bits [14:12]
     input  wire       funct7_i,     // Instruction bit [30]
+    input  wire       isimm_i,
     output reg  [3:0] alu_ctrl_o    // ALU control output
 );
 
@@ -36,12 +37,17 @@ module alu_control (
             2'b01: alu_ctrl_o = `ALU_SUB;  // Branch   -> SUB
             2'b10: begin                  // R-type (use funct fields)
                 case (funct3_i)
-                    `F3_ADD : alu_ctrl_o = funct7_i ? `ALU_SUB : `ALU_ADD; // ADD
+                    `F3_ADD : alu_ctrl_o =
+                    isimm_i
+                        ? `ALU_ADD                  // I-type (ADDI) → always ADD
+                        : (funct7_i ? `ALU_SUB      // R-type SUB (funct7 = 0x20)
+                                    : `ALU_ADD);   // R-type ADD (funct7 = 0x00)
+
                     `F3_SLL : alu_ctrl_o = `ALU_SLL; //SLL
                     `F3_SLT : alu_ctrl_o = `ALU_SLT; // SLT
                     `F3_SLTU: alu_ctrl_o = `ALU_SLTU; //SLTU
                     `F3_XOR : alu_ctrl_o = `ALU_XOR; //XOR
-                    `F3_SRL : alu_ctrl_o = funct7_i ? `ALU_SRA : `ALU_SRL; //SRL
+                    `F3_SRL : alu_ctrl_o = funct7_i ? `ALU_SRA : `ALU_SRL; //SRL or SRA
                     `F3_OR  : alu_ctrl_o = `ALU_OR; // OR
                     `F3_AND : alu_ctrl_o = `ALU_AND;// AND
                     default:  alu_ctrl_o = `ALU_ADD; // Default/invalid funct3: ADD

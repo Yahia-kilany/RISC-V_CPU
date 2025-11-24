@@ -307,6 +307,7 @@ module cpu (
         .alu_op_i  (id_ex_ctrl_w[1:0]),
         .funct3_i  (id_ex_func_w[2:0]),
         .funct7_i  (id_ex_func_w[3]),
+        .isimm_i   (id_ex_ctrl_w[3]),
         .alu_ctrl_o(alu_ctrl_w)
     );
 
