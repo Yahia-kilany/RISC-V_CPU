@@ -28,3 +28,10 @@ RISC-V CPU Implementation Journal
 - Implemented the flushing mechanism
 - updated the block diagram
 - Wrote Parts of the of the report
+9. Block Diagram 
+- updated it to support forwarding and flushing
+11/24/25
+10. RVM Extension:
+- Implemented and test all instructions of the RV32M extension
+11. Report writing:
+- Wrote a good portion of the report
