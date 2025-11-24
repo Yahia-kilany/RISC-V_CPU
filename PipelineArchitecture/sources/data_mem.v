@@ -67,7 +67,7 @@ module data_mem (
 
 initial begin
         // Load memory
-        $readmemh("C:/Users/Yahia/Desktop/RISC-V_CPU/PipelineArchitecture/testcases/lab.mem", mem);
+        $readmemh("C:/Users/OMEN/Desktop/Mememe/college/semester 8/computer architecture/project 1/RISC-V_CPU/PipelineArchitecture/testcases/mextentiontest.hex", mem);
         mem[252] = 8'h34;
         mem[253] = 8'h00;
         mem[254] = 8'h00;

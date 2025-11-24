@@ -1,0 +1,41 @@
+# Simple M Extension Test Program
+# Tests MUL, MULH, DIV, DIVU, REM, REMU
+
+.text
+.globl _start
+
+_start:
+    # Initialize test values
+    addi x1, x0, 12      # x1 = 12
+    addi x2, x0, 5       # x2 = 5
+    addi x3, x0, -8      # x3 = -8 (signed)
+    
+    # Test MUL (12 * 5 = 60)
+    mul  x4, x1, x2      # x4 = 60
+    
+    # Test MULH (signed upper bits)
+    mulh x5, x1, x2      # x5 = upper 32 bits of 12 * 5
+    
+    # Test MULHU (unsigned upper bits)
+    mulhu x6, x1, x2     # x6 = upper 32 bits (unsigned)
+    
+    # Test DIV (12 / 5 = 2)
+    div  x7, x1, x2      # x7 = 2
+    
+    # Test DIVU (unsigned division)
+    divu x8, x1, x2      # x8 = 2
+    
+    # Test REM (12 % 5 = 2)
+    rem  x9, x1, x2      # x9 = 2
+    
+    # Test REMU (unsigned remainder)
+    remu x10, x1, x2     # x10 = 2
+    
+    # Test signed operations with negative number
+    mul  x11, x3, x2     # x11 = -8 * 5 = -40
+    div  x12, x3, x2     # x12 = -8 / 5 = -1
+    rem  x13, x3, x2     # x13 = -8 % 5 = -3
+    
+    # Infinite loop to observe results
+end_loop:
+    beq  x0, x0, end_loop

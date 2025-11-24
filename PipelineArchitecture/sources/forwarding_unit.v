@@ -9,8 +9,8 @@ module forwarding_unit(
 
 always @* begin
     // default: no forwarding
-    forwardA = 2'b00;
-    forwardB = 2'b00;
+    forwardA = 1'b0;
+    forwardB = 1'b0;
 
     // -------------------------
     // ForwardA logic
@@ -22,7 +22,7 @@ always @* begin
              (MEM_WB_RegisterRd != 0) &&
              (MEM_WB_RegisterRd == ID_EX_RegisterRs1))
         forwardA = 1'b1;
-
+    
     // -------------------------
     // ForwardB logic
     // -------------------------
