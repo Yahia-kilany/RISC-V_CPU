@@ -225,7 +225,7 @@ module cpu (
     nmux #(.N(12)) flushidex(.a_i({pc_write_en_w, mem_to_reg_w, pc_to_reg_w, reg_write_w,
                      branch_w, mem_read_w, mem_write_w, jump_w,
                      b_sel_w, a_sel_w, alu_op_w}),
-                        .b_i(12'd000), .s_i(pc_mux_sel_w), .c_o(decode_or_flush_w));
+                        .b_i(12'd2048), .s_i(pc_mux_sel_w), .c_o(decode_or_flush_w));
     
     register #(.N(165)) id_ex_reg (
         .clk     (clk),
@@ -351,7 +351,7 @@ module cpu (
     wire [7:0] execute_or_flush_w;
 
     nmux #(.N(8)) flushexmem(.a_i(id_ex_ctrl_w[11:4]),
-                        .b_i(8'h00), .s_i(pc_mux_sel_w), .c_o(execute_or_flush_w));
+                        .b_i(8'h80), .s_i(pc_mux_sel_w), .c_o(execute_or_flush_w));
                         
     register #(.N(147)) ex_mem_reg (
         .clk     (~clk),
@@ -494,38 +494,64 @@ module cpu (
         .c_o (writeback_data_w)
     );
 
+// =================================================
+// LED / 7-SEG OUTPUTS
+// =================================================
 
-    // =================================================
-    // LED / 7-SEG OUTPUTS
-    // =================================================
+always @(*) begin
+    case (led_sel_i)
+        // Pipeline Stage 1: IF/ID - Show fetched instruction
+        2'b00: inst_led_o = if_id_inst_w[15:0];
+        
+        // Pipeline Stage 2: ID/EX - Show control signals entering EX
+        2'b01: inst_led_o = {id_ex_ctrl_w[11:0], id_ex_rd_w[3:0]};
+        
+        // Pipeline Stage 3: EX/MEM - Show hazard & control info
+        2'b10: inst_led_o = {ex_mem_ctrl_w, ex_mem_take_branch_w, pc_mux_sel_w, 
+                             forwarda_w, forwardb_w, 
+                             ex_mem_rd_w[4:0]};
+        
+        // Pipeline Stage 4: MEM/WB - Show writeback info
+        2'b11: inst_led_o = {mem_wb_ctrl_w, 
+                             mem_wb_rd_w[4:0], 
+                             iscomp_w, 
+                             cf_w, vf_w, sf_w, zf_w, 
+                             3'b000};
+        
+        default: inst_led_o = 16'd0;
+    endcase
 
-    always @(*) begin
-        case (led_sel_i)
-            2'b00: inst_led_o = mem_read_data_w[15:0];
-            2'b01: inst_led_o = mem_read_data_w[31:16];
-            2'b10: inst_led_o = {cf_w, vf_w, sf_w, zf_w,
-                                 branch_w, mem_read_w, mem_to_reg_w,
-                                 mem_write_w, reg_write_w,
-                                 pc_mux_sel_w, alu_op_w, alu_ctrl_w};
-            2'b11: inst_led_o = {12'b0, a_sel_w, b_sel_w};
-            default: inst_led_o = 16'd0;
-        endcase
-
-        case (ssd_sel_i)
-            4'b0000: ssd_o = pc_out_w[12:0];
-            4'b0001: ssd_o = pc_step_w[12:0];
-            4'b0010: ssd_o = pc_branch_w[12:0];
-            4'b0011: ssd_o = pc_in_w[12:0];
-            4'b0100: ssd_o = reg_read1_w[12:0];
-            4'b0101: ssd_o = reg_read2_w[12:0];
-            4'b0110: ssd_o = write_data_w[12:0];
-            4'b0111: ssd_o = imm_w[12:0];
-            4'b1000: ssd_o = imm_w[12:0];
-            4'b1001: ssd_o = alu_in_b_w[12:0];
-            4'b1010: ssd_o = alu_out_w[12:0];
-            4'b1011: ssd_o = mem_read_data_w[12:0];
-            default: ssd_o = 13'd0;
-        endcase
-    end
+    case (ssd_sel_i)
+        // IF Stage
+        4'b0000: ssd_o = pc_out_w[12:0];           // Current PC (IF stage)
+        4'b0001: ssd_o = pc_step_w[12:0];          // PC+4/2 (next sequential)
+        
+        // ID Stage  
+        4'b0010: ssd_o = if_id_pc_w[12:0];         // PC in ID stage
+        4'b0011: ssd_o = imm_w[12:0];              // Immediate generated in ID
+        
+        // EX Stage
+        4'b0100: ssd_o = id_ex_pc_w[12:0];         // PC in EX stage
+        4'b0101: ssd_o = alu_in_a_w[12:0];         // ALU input A (after forwarding)
+        4'b0110: ssd_o = alu_in_b_w[12:0];         // ALU input B (after forwarding)
+        4'b0111: ssd_o = alu_out_w[12:0];          // ALU result
+        
+        // MEM Stage
+        4'b1000: ssd_o = ex_mem_branch_addr_w[12:0];  // Branch target address
+        4'b1001: ssd_o = ex_mem_alu_out_w[12:0];      // ALU result in MEM stage
+        4'b1010: ssd_o = mem_read_data_w[12:0];       // Data from memory
+        
+        // WB Stage
+        4'b1011: ssd_o = mem_wb_alu_out_w[12:0];      // ALU result in WB stage
+        4'b1100: ssd_o = write_data_w[12:0];          // Data before WB mux
+        4'b1101: ssd_o = writeback_data_w[12:0];      // Final writeback data
+        
+        // Additional useful signals
+        4'b1110: ssd_o = pc_target_w[12:0];           // Selected branch/jump target
+        4'b1111: ssd_o = pc_in_w[12:0];               // Next PC value
+        
+        default: ssd_o = 13'd0;
+    endcase
+end
 
 endmodule

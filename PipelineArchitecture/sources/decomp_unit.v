@@ -64,8 +64,7 @@ localparam [8*5-1:0] COMP_REGS = {
                         decomp_inst_o[11:7]       = {comp_inst_i[11:10], comp_inst_i[6], 2'b0};
                         decomp_inst_o[31:25]      = {5'b0, comp_inst_i[5],comp_inst_i[12]};
                     end
-                    default: decomp_inst_o = 32'd3;
-                            
+                    default: decomp_inst_o = 32'd00000013;
                 endcase
 
             //======================================
@@ -169,9 +168,10 @@ localparam [8*5-1:0] COMP_REGS = {
                                         // C.AND: c.and rd', rs2' -> and rd', rd', rs2'
                                         decomp_inst_o[`IR_funct3] = `F3_AND;
                                     end
-
+                                default: decomp_inst_o = 32'd00000013;
                                 endcase
                             end
+                            default: decomp_inst_o = 32'd00000013;
                         endcase
 
                     end
@@ -203,6 +203,7 @@ localparam [8*5-1:0] COMP_REGS = {
                         {{decomp_inst_o[31]}, decomp_inst_o[7], decomp_inst_o[30:25], decomp_inst_o[11:8]} = {{4{comp_inst_i[12]}}
                             ,comp_inst_i[12], comp_inst_i[6:5], comp_inst_i[2], comp_inst_i[11:10], comp_inst_i[4:3]};
                     end
+                default: decomp_inst_o = 32'd00000013;
             endcase
 
             //======================================
@@ -268,8 +269,9 @@ localparam [8*5-1:0] COMP_REGS = {
                     decomp_inst_o[11:7]       = {comp_inst_i[11:9], 2'b0};
                     decomp_inst_o[31:25]      = {4'b0, comp_inst_i[8:7],comp_inst_i[12]};
                 end
-                
+                default: decomp_inst_o = 32'd00000013;
             endcase
+            default: decomp_inst_o = 32'd00000013;
         endcase
     end
 endmodule

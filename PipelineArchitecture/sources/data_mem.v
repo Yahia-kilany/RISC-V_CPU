@@ -66,12 +66,11 @@ module data_mem (
  integer i;
 
 initial begin
-        // Load memory
-        $readmemh("C:/Users/OMEN/Desktop/Mememe/college/semester 8/computer architecture/project 1/RISC-V_CPU/PipelineArchitecture/testcases/mextentiontest.hex", mem);
-        mem[252] = 8'h34;
-        mem[253] = 8'h00;
-        mem[254] = 8'h00;
-        mem[255] = 8'h00;
+                // Initialize all memory to 0
+        for (i = 0; i < (4*1024); i = i + 2) begin
+            {mem[i+1],mem[i]} = 16'b0000000000000001; // C.NOP
+        end
+        $readmemh("C:/Users/Yahia/Desktop/RISC-V_CPU/PipelineArchitecture/testcases/factorial.hex",mem);
     end
 
 endmodule
