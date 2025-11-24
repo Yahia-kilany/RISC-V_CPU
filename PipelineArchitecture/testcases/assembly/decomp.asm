@@ -27,11 +27,6 @@ c.srli  x1, 1          # x1 = (((5 + -2) << 1) >> 2) >> 1
 c.andi x8, 4        # x8 = x8 & 4
 c.j    4            # pc += 4
 c.addi x6, 1        # x6 = x6 + 1
-c.jal  6           # x1 = pc+2 ; pc +=  6
-c.addi x7, -3       # x7 = x7 - 3
-c.bnez x11, 4        # if x11 != 0 -> pc += 4
-c.jr   x1 # pc = x1
-
 c.nop  
 c.ebreak
   
