@@ -1,5 +1,4 @@
 `include "defines.v"
-
 /*******************************************************************
 *
 * Module: alu.v
@@ -8,33 +7,32 @@
 * Author: Ouail Slama 
 *
 * Description:
-*   N-bit ALU supporting ADD, SUB, AND, OR , shift and logical
-*    operations
+*   N-bit ALU supporting ADD, SUB, AND, OR, shift, logical,
+*   and M extension (MUL/DIV) operations
 *
 * Dependencies: 
-*   nmux.v, rca.v, mux16x1.v
+*   nmux.v, rca.v, mux16x1.v, shifter.v
 *
 * Change history:
-*   10/07/2025 – Initial lab version created
-*   11/02/2025 – Adapted and cleaned for project use (Yahia)
-*   11/05/2025 – Downloaded from Canvas and integrated into project (Yahia)
+*   10/07/2025 - Initial lab version created
+*   11/02/2025 - Adapted and cleaned for project use (Yahia)
+*   11/05/2025 - Downloaded from Canvas and integrated into project (Yahia)
+*   11/24/2025 - Added M extension support (MUL/DIV operations) (Ouail)
 *******************************************************************/
-
 module alu(
 	input   wire [31:0] a_i,
     input   wire [31:0] b_i,
 	input   wire [4:0]  shamt_i,
-	input   wire [3:0]  alu_ctrl_i,
+	input   wire [4:0]  alu_ctrl_i,      // Expanded to 5 bits
 	output  reg  [31:0] c_o,
 	output  wire        cf_o,
     output  wire        zf_o,
     output  wire        vf_o,
     output  wire        sf_o
 );
-
     wire [31:0] add_w;
     wire [31:0] op_b;
-
+    
     // Conditional inversion for subtraction
     assign op_b = (~b_i);
     assign {cf_o, add_w} = alu_ctrl_i[0] ? (a_i + op_b + 1'b1) : (a_i + b_i);
@@ -45,33 +43,59 @@ module alu(
     assign vf_o = (a_i[31] ^ (op_b[31]) ^ add_w[31] ^ cf_o);
     
     // Shifter
-    wire[31:0] sh_w;
-    shifter shifter0(.a_i(a_i), .shamt_i(shamt_i), .type_i(alu_ctrl_i),  .c_o(sh_w));
-
+    wire [31:0] sh_w;
+    shifter shifter0(.a_i(a_i), .shamt_i(shamt_i), .type_i(alu_ctrl_i[3:0]), .c_o(sh_w));
+    
+    // M extension: Multiplication and Division
+    wire signed [31:0] a_signed = a_i;
+    wire signed [31:0] b_signed = b_i;
+    wire signed [63:0] mul_signed = a_signed * b_signed;
+    wire [63:0] mul_unsigned = a_i * b_i;
+    wire signed [63:0] mul_su = a_signed * $signed({1'b0, b_i});
+    
+    wire signed [31:0] div_signed = (b_signed == 0) ? -1 : (a_signed / b_signed);
+    wire [31:0] div_unsigned = (b_i == 0) ? 32'hFFFFFFFF : (a_i / b_i);
+    wire signed [31:0] rem_signed = (b_signed == 0) ? a_signed : (a_signed % b_signed);
+    wire [31:0] rem_unsigned = (b_i == 0) ? a_i : (a_i % b_i);
+    
     // ALU operation select
     always @(*) begin
         c_o = 32'b0;
         case (alu_ctrl_i)
-            // arithmetic
+            // Arithmetic
             `ALU_ADD : c_o = add_w;                        // ADD
             `ALU_SUB : c_o = add_w;                        // SUB
             `ALU_PASS: c_o = b_i;                          // Pass B
-            // logic
+            
+            // Logic
             `ALU_OR  : c_o = a_i | b_i;                    // OR
             `ALU_AND : c_o = a_i & b_i;                    // AND
             `ALU_XOR : c_o = a_i ^ b_i;                    // XOR
-            // shift
-            `ALU_SRL : c_o = sh_w;                         // SLL
-            `ALU_SRA : c_o = sh_w;                         // SRL
-            `ALU_SLL : c_o = sh_w;                         // SRA
-            // set less than
+            
+            // Shift
+            `ALU_SRL : c_o = sh_w;                         // SRL
+            `ALU_SRA : c_o = sh_w;                         // SRA
+            `ALU_SLL : c_o = sh_w;                         // SLL
+            
+            // Set less than
             `ALU_SLT : c_o = {31'b0, (sf_o != vf_o)};      // SLT
             `ALU_SLTU: c_o = {31'b0, (~cf_o)};             // SLTU
+            
+            // M Extension: Multiplication
+            `ALU_MUL   : c_o = mul_signed[31:0];           // MUL (lower 32 bits)
+            `ALU_MULH  : c_o = mul_signed[63:32];          // MULH (upper 32 bits, signed × signed)
+            `ALU_MULHSU: c_o = mul_su[63:32];              // MULHSU (upper 32 bits, signed × unsigned)
+            `ALU_MULHU : c_o = mul_unsigned[63:32];        // MULHU (upper 32 bits, unsigned × unsigned)
+            
+            // M Extension: Division
+            `ALU_DIV   : c_o = div_signed;                 // DIV (signed)
+            `ALU_DIVU  : c_o = div_unsigned;               // DIVU (unsigned)
+            
+            // M Extension: Remainder
+            `ALU_REM   : c_o = rem_signed;                 // REM (signed)
+            `ALU_REMU  : c_o = rem_unsigned;               // REMU (unsigned)
+            
             default: c_o = 32'b0;
         endcase
     end
-
 endmodule
-
-
- 

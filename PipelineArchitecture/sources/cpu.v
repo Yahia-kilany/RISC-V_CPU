@@ -58,7 +58,7 @@ module cpu (
     wire [31:0] write_data_w;     // memory output(load) or  alu output 
     wire [31:0] writeback_data_w; // data written back to register file
 
-    wire [3:0]  alu_ctrl_w;     // ALU control signal (operation select)
+    wire [4:0]  alu_ctrl_w;     // ALU control signal (operation select)
     wire [2:0]  load_type_w;    // load type (byte, halfword, word, signed/unsigned)
     wire [1:0]  store_type_w;   // store type (byte, halfword, word)
     wire        take_branch_w;  // branch decision
@@ -96,7 +96,7 @@ module cpu (
     wire [31:0] id_ex_reg1_w;    // RS1 register value entering EX
     wire [31:0] id_ex_reg2_w;    // RS2 register value entering EX
     wire [31:0] id_ex_imm_w;     // immediate value entering EX 
-    wire [3:0]  id_ex_func_w;    // ALU control / func3+func7 bits
+    wire [9:0]  id_ex_func_w;    // ALU control / func3+func7 bits
     wire [4:0]  id_ex_rs1_w;     // RS1 index forwarded to EX
     wire [4:0]  id_ex_rs2_w;     // RS2 index forwarded to EX
     wire [4:0]  id_ex_rd_w;      // destination register index forwarded to EX
@@ -159,8 +159,6 @@ module cpu (
     // =================================================
     // IF/ID PIPELINE REGISTER
     // =================================================
-    wire [31:0] inst_or_flush_w;
-    nmux #(32) flushifid (pc_mux_sel_w,mem_read_data_w,32'b00000000000000000000000000110011,  inst_or_flush_w);
 
     
     register #(.N(64)) if_id_reg (
@@ -229,7 +227,7 @@ module cpu (
                      b_sel_w, a_sel_w, alu_op_w}),
                         .b_i(12'd000), .s_i(pc_mux_sel_w), .c_o(decode_or_flush_w));
     
-    register #(.N(159)) id_ex_reg (
+    register #(.N(165)) id_ex_reg (
         .clk     (clk),
         .rst     (rst),
         .wr_en_i (1'b1),
@@ -239,7 +237,7 @@ module cpu (
                     reg_read1_w,
                     reg_read2_w,
                     imm_w,
-                    {inst_final_w[30], inst_final_w[14:12]},
+                    {inst_final_w[31:25], inst_final_w[14:12]},
                     inst_final_w[19:15],
                     inst_final_w[24:20],
                     inst_final_w[11:7]
@@ -306,7 +304,7 @@ module cpu (
     alu_control alu_ctrl_inst (
         .alu_op_i  (id_ex_ctrl_w[1:0]),
         .funct3_i  (id_ex_func_w[2:0]),
-        .funct7_i  (id_ex_func_w[3]),
+        .funct7_i  (id_ex_func_w[9:3]), 
         .isimm_i   (id_ex_ctrl_w[3]),
         .alu_ctrl_o(alu_ctrl_w)
     );
