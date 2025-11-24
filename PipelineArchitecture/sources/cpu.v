@@ -36,7 +36,7 @@ module cpu (
     //PC wires 
     wire [31:0] pc_in_w;        // next PC value (from mux)
     wire [31:0] pc_out_w;       // current PC value
-    wire [31:0] pc_plus_four_w; // PC + 4 (normal sequential flow)
+    wire [31:0] pc_step_w; // PC + 4 or 2 (normal sequential flow)
 
 
 
@@ -82,7 +82,7 @@ module cpu (
     wire        zf_w;           // zero flag
     wire        vf_w;           // overflow flag
     wire        sf_w;           // sign flag
-
+    wire        iscomp_w;        //instruction is rv32c
     // ---------------------
     // PIPELINE WIRES
     // ---------------------
@@ -136,17 +136,26 @@ module cpu (
         .d_i      (pc_in_w),
         .d_o      (pc_out_w)
     );
+    
+    assign iscomp_w = (if_id_inst_w[1] & if_id_inst_w[0]);
+    wire [31:0] pc_inc_w;
 
+    nmux #(.N(32)) pc_add_mux (
+        .a_i (32'd2),
+        .b_i (32'd4),
+        .s_i (clk & iscomp_w),
+        .c_o (pc_inc_w)
+    );    
 
     rca #(.N(32)) following_pc_adder (
         .a_i   (pc_out_w),
-        .b_i   (32'd4),
+        .b_i   (pc_inc_w),
         .c_i   (1'b0),
         .c_o   (),
-        .s_o   (pc_plus_four_w)
+        .s_o   (pc_step_w)
     );
 
-
+   
     // =================================================
     // IF/ID PIPELINE REGISTER
     // =================================================
@@ -166,10 +175,19 @@ module cpu (
     // =================================================
     // DECODE STAGE
     // =================================================
+    wire [31:0] decomp_inst_w;
+    wire [31:0] inst_final_w;
+    decomp_unit U_DECOMP (.comp_inst_i(if_id_inst_w[15:0]), .decomp_inst_o(decomp_inst_w));
     
-    
+    nmux #(.N(32)) inst_mux (
+        .a_i (if_id_inst_w),
+        .b_i (decomp_inst_w),
+        .s_i (~(if_id_inst_w[1] & if_id_inst_w[0])),
+        .c_o (inst_final_w)
+    );    
+
     control_unit ctrl_unit (
-        .opcode_i      (if_id_inst_w[`IR_opcode]),
+        .opcode_i      (inst_final_w[`IR_opcode]),
         .branch_o      (branch_w),
         .mem_rd_o      (mem_read_w),
         .mem_to_reg_o  (mem_to_reg_w),
@@ -186,8 +204,8 @@ module cpu (
     reg_file #(.N(32)) reg_file_inst (
         .clk        (~clk),
         .rst        (rst),
-        .rd_addr1_i (if_id_inst_w[`IR_rs1]),
-        .rd_addr2_i (if_id_inst_w[`IR_rs2]),
+        .rd_addr1_i (inst_final_w[`IR_rs1]),
+        .rd_addr2_i (inst_final_w[`IR_rs2]),
         .wr_addr_i  (mem_wb_rd_w),
         .wr_en_i    (mem_wb_ctrl_w[0]),
         .wr_data_i  (writeback_data_w),
@@ -196,7 +214,7 @@ module cpu (
     );
 
     imm_gen imm_gen_inst (
-        .inst_i (if_id_inst_w),
+        .inst_i (inst_final_w),
         .gen_o  (imm_w)
     );
 
@@ -221,10 +239,10 @@ module cpu (
                     reg_read1_w,
                     reg_read2_w,
                     imm_w,
-                    {if_id_inst_w[30], if_id_inst_w[14:12]},
-                    if_id_inst_w[19:15],
-                    if_id_inst_w[24:20],
-                    if_id_inst_w[11:7]
+                    {inst_final_w[30], inst_final_w[14:12]},
+                    inst_final_w[19:15],
+                    inst_final_w[24:20],
+                    inst_final_w[11:7]
                  }),
         .d_o     ({
                     id_ex_ctrl_w,
@@ -333,7 +351,7 @@ module cpu (
     // =================================================
     wire [7:0] execute_or_flush_w;
 
-    nmux #(.n(8)) flushexmem(.a_i(id_ex_ctrl_w[11:4]),
+    nmux #(.N(8)) flushexmem(.a_i(id_ex_ctrl_w[11:4]),
                         .b_i(8'h00), .s_i(pc_mux_sel_w), .c_o(execute_or_flush_w));
                         
     register #(.N(147)) ex_mem_reg (
@@ -345,7 +363,7 @@ module cpu (
                     pc_branch_w,
                     take_branch_w,
                     alu_out_w,
-                    id_ex_reg2_w,
+                    forwarding_register2_w,
                     id_ex_rd_w,
                     load_type_w,
                     store_type_w,
@@ -426,7 +444,7 @@ module cpu (
     );
 
     nmux #(.N(32)) pc_mux (
-        .a_i (pc_plus_four_w),
+        .a_i (pc_step_w),
         .b_i (pc_target_w),
         .s_i (pc_mux_sel_w),
         .c_o (pc_in_w)
@@ -447,7 +465,7 @@ module cpu (
                     mem_read_data_w,
                     ex_mem_alu_out_w,
                     ex_mem_rd_w,
-                    ex_mem_pc_w+4
+                    pc_out_w
                  }),
         .d_o     ({
                     mem_wb_ctrl_w,
@@ -496,7 +514,7 @@ module cpu (
 
         case (ssd_sel_i)
             4'b0000: ssd_o = pc_out_w[12:0];
-            4'b0001: ssd_o = pc_plus_four_w[12:0];
+            4'b0001: ssd_o = pc_step_w[12:0];
             4'b0010: ssd_o = pc_branch_w[12:0];
             4'b0011: ssd_o = pc_in_w[12:0];
             4'b0100: ssd_o = reg_read1_w[12:0];

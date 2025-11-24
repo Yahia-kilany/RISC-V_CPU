@@ -2,7 +2,7 @@
 `define COMP_REGS(i) (COMP_REGS[(i)*5 +: 5])
 /*******************************************************************
 *
-* Module: decomp_unit_tb
+* Module: decomp_unit
 * Project: RISC-V_CPU
 * Author: Yahia Kilany
 *
